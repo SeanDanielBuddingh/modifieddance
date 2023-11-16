@@ -15,6 +15,10 @@ class data_pre():
     def __init__(self):
         
         self.test= 1
+        current_dir = os.path.dirname(__file__)
+        target_dir = os.path.join(current_dir, '..', '..', 'target_folder')
+        normalized_path = os.path.normpath(target_dir)
+        self.path = normalized_path
         #brain_x, corpus_brain, spleen_x, corpus_spleen, kidney_x, corpus_kidney, brain_y, spleen_y, kidney_y, b_train, corpus_btrain, s_train, corpus_strain, k_train, corpus_ktrain, btrain_y, strain_y, ktrain_y = self.load_data()
         
         #self.get_w2v(brain_x, corpus_brain, spleen_x, corpus_spleen, kidney_x, corpus_kidney, brain_y, spleen_y, kidney_y,
@@ -226,12 +230,12 @@ class data_pre():
         kidney_y.to_csv('kidney_y.csv', index=False)
 
     def read_w2v(self):
-        train = np.genfromtxt('b_train.csv', delimiter=',')
-        genes = np.genfromtxt('brain_w2v_genes.csv', delimiter=',')
-        y_train = np.loadtxt('btrain_y.csv', delimiter=',', unpack=True, skiprows=1, dtype=str)
-        normalized = pd.read_csv('normalized_brain.csv', header=0, index_col=0)
-        test = np.genfromtxt('brain_cells.csv', delimiter=',')
-        y_test = np.loadtxt('brain_y.csv', delimiter=',', unpack=True, skiprows=1, dtype=str)
+        train = np.genfromtxt(self.path+'/b_train.csv', delimiter=',')
+        genes = np.genfromtxt(self.path+'/brain_w2v_genes.csv', delimiter=',')
+        y_train = np.loadtxt(self.path+'/train_y.csv', delimiter=',', unpack=True, skiprows=1, dtype=str)
+        normalized = pd.read_csv(self.path+'/normalized_brain.csv', header=0, index_col=0)
+        test = np.genfromtxt(self.path+'/brain_cells.csv', delimiter=',')
+        y_test = np.loadtxt(self.path+'/brain_y.csv', delimiter=',', unpack=True, skiprows=1, dtype=str)
 
         return train, y_train, genes, normalized, test, y_test
     def w2v_embed(self, corpus):
