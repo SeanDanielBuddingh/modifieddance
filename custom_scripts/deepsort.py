@@ -5,6 +5,8 @@ current_script_path = __file__
 current_dir = os.path.dirname(current_script_path)
 parent_dir = os.path.dirname(current_dir)
 sys.path.append(parent_dir)
+parent_parent = os.path.dirname(parent_dir)
+data_dir_ = parent_dir+'\dance+data'
 
 import vessl
 
@@ -15,6 +17,7 @@ import numpy as np
 import dgl
 import copy
 import gc
+
 
 #ScDeepSort Imports
 from dance.modules.single_modality.cell_type_annotation.scdeepsort import ScDeepSort
@@ -62,7 +65,7 @@ def train_pipeline(n_components: int = 400, log_level: LogLevel = "INFO"):
         log_level=log_level,
     )
 dataset = ScDeepSortDataset(species="mouse", tissue="Brain",
-                            train_dataset=["753", "3285"], test_dataset=["2695"])
+                            train_dataset=["753", "3285"], test_dataset=["2695"], data_dir = data_dir_)
 data = dataset.load_data()
 preprocessing_pipeline(data)
 train_pipeline()(data)
