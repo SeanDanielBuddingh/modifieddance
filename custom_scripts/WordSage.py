@@ -1,3 +1,9 @@
+import os
+import sys
+current_script_path = __file__
+current_dir = os.path.dirname(current_script_path)
+parent_dir = os.path.dirname(current_dir)
+sys.path.append(parent_dir)
 import torch
 import torch.nn.functional as F
 import numpy as np
@@ -17,7 +23,6 @@ import copy
 from dance.modules.single_modality.cell_type_annotation.scdeepsort import ScDeepSort
 from dance.utils import set_seed
 
-import os
 os.environ["DGLBACKEND"] = "pytorch"
 from pprint import pprint
 from dance.datasets.singlemodality import ScDeepSortDataset

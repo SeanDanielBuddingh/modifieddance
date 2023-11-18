@@ -1,6 +1,11 @@
+import os
+import sys
+current_script_path = __file__
+current_dir = os.path.dirname(current_script_path)
+parent_dir = os.path.dirname(current_dir)
+sys.path.append(parent_dir)
 import dance
 from dance.datasets.singlemodality import ScDeepSortDataset
-import os
 os.environ['DGLBACKEND'] = 'pytorch'
 import torch
 import numpy as np
@@ -14,11 +19,14 @@ import gc
 class data_pre():
     def __init__(self):
         
-        self.test= 1
-        current_dir = os.path.dirname(__file__)
-        target_dir = os.path.join(current_dir, '..', '..', 'target_folder')
-        normalized_path = os.path.normpath(target_dir)
-        self.path = normalized_path
+        current_script_path = __file__
+        current_dir = os.path.dirname(current_script_path)
+        parent_dir = os.path.dirname(current_dir)
+        sys.path.append(parent_dir)
+        parent_parent = os.path.dirname(parent_dir)
+        data_dir_ = parent_parent+'\dance_data'
+        self.path = data_dir_
+
         #brain_x, corpus_brain, spleen_x, corpus_spleen, kidney_x, corpus_kidney, brain_y, spleen_y, kidney_y, b_train, corpus_btrain, s_train, corpus_strain, k_train, corpus_ktrain, btrain_y, strain_y, ktrain_y = self.load_data()
         
         #self.get_w2v(brain_x, corpus_brain, spleen_x, corpus_spleen, kidney_x, corpus_kidney, brain_y, spleen_y, kidney_y,
@@ -230,12 +238,12 @@ class data_pre():
         kidney_y.to_csv('kidney_y.csv', index=False)
 
     def read_w2v(self):
-        train = np.genfromtxt(self.path+'/b_train.csv', delimiter=',')
-        genes = np.genfromtxt(self.path+'/brain_w2v_genes.csv', delimiter=',')
-        y_train = np.loadtxt(self.path+'/train_y.csv', delimiter=',', unpack=True, skiprows=1, dtype=str)
-        normalized = pd.read_csv(self.path+'/normalized_brain.csv', header=0, index_col=0)
-        test = np.genfromtxt(self.path+'/brain_cells.csv', delimiter=',')
-        y_test = np.loadtxt(self.path+'/brain_y.csv', delimiter=',', unpack=True, skiprows=1, dtype=str)
+        train = np.genfromtxt(self.path+'\\b_train.csv', delimiter=',')
+        genes = np.genfromtxt(self.path+'\\brain_w2v_genes.csv', delimiter=',')
+        y_train = np.loadtxt(self.path+'\\train_y.csv', delimiter=',', unpack=True, skiprows=1, dtype=str)
+        normalized = pd.read_csv(self.path+'\\normalized_brain.csv', header=0, index_col=0)
+        test = np.genfromtxt(self.path+'\\brain_cells.csv', delimiter=',')
+        y_test = np.loadtxt(self.path+'\\brain_y.csv', delimiter=',', unpack=True, skiprows=1, dtype=str)
 
         return train, y_train, genes, normalized, test, y_test
     def w2v_embed(self, corpus):

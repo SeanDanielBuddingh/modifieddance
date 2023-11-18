@@ -6,7 +6,7 @@ current_dir = os.path.dirname(current_script_path)
 parent_dir = os.path.dirname(current_dir)
 sys.path.append(parent_dir)
 parent_parent = os.path.dirname(parent_dir)
-data_dir_ = parent_dir+'\dance+data'
+data_dir_ = parent_parent+'\dance_data'
 
 import vessl
 
