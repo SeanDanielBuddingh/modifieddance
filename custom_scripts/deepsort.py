@@ -1,3 +1,11 @@
+import sys
+import os
+
+current_script_path = __file__
+current_dir = os.path.dirname(current_script_path)
+parent_dir = os.path.dirname(current_dir)
+sys.path.append(parent_dir)
+
 import vessl
 
 import torch
@@ -12,7 +20,6 @@ import gc
 from dance.modules.single_modality.cell_type_annotation.scdeepsort import ScDeepSort
 from dance.utils import set_seed
 
-import os
 os.environ["DGLBACKEND"] = "pytorch"
 from pprint import pprint
 from dance.datasets.singlemodality import ScDeepSortDataset
@@ -44,7 +51,7 @@ set_seed(42)
 
 model = ScDeepSort(dim_in=in_channels, dim_hid=hidden_channels, num_layers=1, species='mouse', tissue='Kidney', device=device)
 preprocessing_pipeline = Compose(
-    AnnDataTransform(sc.pp.normalize_total, target_sum=1e-4),
+    AnnDataTransform(sc.pp.normalize_total, target_sum=1e4),
     AnnDataTransform(sc.pp.log1p),
     FilterGenesPercentile(min_val=1, max_val=99, mode="sum"),
 )
