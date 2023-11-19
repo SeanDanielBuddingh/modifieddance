@@ -1,10 +1,10 @@
 # basic image
-FROM nvidia/cuda:11.3.0-cudnn8-runtime-ubuntu20.04
+FROM nvidia/cuda:11.1.1-cudnn8-runtime-ubi8
 
 # install Python3 and pip3
 RUN apt-get update && apt-get install -y python3 python3-pip
 
-RUN apt-get install -y wget
+RUN yum install -y wget bzip2 
 
 ENV CONDA_AUTO_UPDATE_CONDA=false
 ENV PATH=/opt/conda/bin:$PATH

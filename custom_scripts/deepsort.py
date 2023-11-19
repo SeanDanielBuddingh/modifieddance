@@ -8,8 +8,6 @@ sys.path.append(parent_dir)
 parent_parent = os.path.dirname(parent_dir)
 data_dir_ = parent_parent+'\dance_data'
 
-import vessl
-
 import torch
 import torch.nn.functional as F
 import numpy as np
@@ -34,8 +32,6 @@ from dance.transforms.graph import PCACellFeatureGraph, CellFeatureGraph
 from dance.typing import LogLevel, Optional
 
 import matplotlib.pyplot as plt
-
-vessl.init()
 
 train_losses = []
 train_accuracies = []
