@@ -23,7 +23,8 @@ class data_pre():
         parent_dir = os.path.dirname(current_dir)
         sys.path.append(parent_dir)
         parent_parent = os.path.dirname(parent_dir)
-        data_dir_ = parent_parent+'\dance_data'
+        parent_parent = parent_parent.replace("\\", "")
+        data_dir_ = parent_parent+'/dance_data'
         self.path = data_dir_
         
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
