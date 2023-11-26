@@ -65,6 +65,8 @@ dataset = ScDeepSortDataset(species="mouse", tissue="Brain",
 data = dataset.load_data()
 preprocessing_pipeline(data)
 train_pipeline()(data)
+data.to('cuda')
+model.to('cuda')
 y_train = data.get_train_data(return_type="torch")[1]
 y_test = data.get_test_data(return_type="torch")[1]
 y_train = torch.cat([y_train, y_test], dim=0)
