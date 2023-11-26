@@ -23,7 +23,7 @@ class data_pre():
         parent_dir = os.path.dirname(current_dir)
         sys.path.append(parent_dir)
         parent_parent = os.path.dirname(parent_dir)
-        parent_parent = parent_parent.replace("\\", "")
+        parent_parent = parent_parent.replace("\\", "/")
         data_dir_ = parent_parent+'/dance_data'
         self.path = data_dir_
         
@@ -261,7 +261,8 @@ class data_pre():
         '''
         w2v_embed = Word2Vec(corpus, min_count=1)
         return w2v_embed
-
+    
+    @torch.no_grad()
     def bert_embed(self, x, corpus, y):
         chunk_size = 256
         tokenizer = BertTokenizer.from_pretrained("bert-base-uncased")
