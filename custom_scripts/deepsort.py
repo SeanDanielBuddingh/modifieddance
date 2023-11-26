@@ -48,7 +48,7 @@ set_seed(42)
 
 #ScDeepSort
 
-model = ScDeepSort(dim_in=in_channels, dim_hid=hidden_channels, num_layers=1, species='mouse', tissue='Kidney', device=device)
+model = ScDeepSort(dim_in=in_channels, dim_hid=hidden_channels, num_layers=1, species='mouse', tissue='Kidney', device=torch.device('cuda'))
 preprocessing_pipeline = Compose(
     AnnDataTransform(sc.pp.normalize_total, target_sum=1e4),
     AnnDataTransform(sc.pp.log1p),
