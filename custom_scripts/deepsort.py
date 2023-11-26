@@ -65,7 +65,7 @@ dataset = ScDeepSortDataset(species="mouse", tissue="Brain",
 data = dataset.load_data()
 preprocessing_pipeline(data)
 train_pipeline()(data)
-data.to('cuda')
+
 model.to('cuda')
 y_train = data.get_train_data(return_type="torch")[1]
 y_test = data.get_test_data(return_type="torch")[1]
@@ -75,7 +75,7 @@ y_test = torch.argmax(y_test, 1)
 print(y_train)
 print(y_test)
 print(data.data.uns['CellFeatureGraph'])
-model.fit(graph=data.data.uns["CellFeatureGraph"], labels=y_train)
+model.fit(graph=data.data.uns["CellFeatureGraph"].to('cuda'), labels=y_train)
 train_losses = model.train_losses
 train_accuracies = model.train_accuracies
 
