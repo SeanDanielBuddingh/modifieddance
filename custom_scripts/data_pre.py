@@ -266,7 +266,9 @@ class data_pre():
     def bert_embed(self, x, corpus, y):
         chunk_size = 256
         tokenizer = BertTokenizer.from_pretrained("bert-base-uncased")
-        model = BertModel.from_pretrained("bert-base-uncased").to(self.device)
+        model = BertModel.from_pretrained("bert-base-uncased")
+        model = nn.DataParallel(model)
+        model.to(self.device)
         outputs = []
         for sentence in corpus:
             tokenized_text = tokenizer(sentence, return_tensors="pt", truncation=True, padding=True)
