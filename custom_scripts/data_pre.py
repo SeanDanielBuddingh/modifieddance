@@ -29,9 +29,9 @@ class data_pre():
         
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
-        brain_x, corpus_brain, spleen_x, corpus_spleen, kidney_x, corpus_kidney, brain_y, spleen_y, kidney_y, b_train, corpus_btrain, s_train, corpus_strain, k_train, corpus_ktrain, btrain_y, strain_y, ktrain_y = self.load_data()
+        #brain_x, corpus_brain, spleen_x, corpus_spleen, kidney_x, corpus_kidney, brain_y, spleen_y, kidney_y, b_train, corpus_btrain, s_train, corpus_strain, k_train, corpus_ktrain, btrain_y, strain_y, ktrain_y = self.load_data()
         
-        self.bert_embed(brain_x, corpus_brain, brain_y)
+        #self.bert_embed(brain_x, corpus_brain, brain_y)
         #self.bert_embed(spleen_x, corpus_spleen, spleen_y)
         #self.bert_embed(spleen_x, corpus_spleen, kidney_y)
         #self.bert_embed(b_train, corpus_btrain, btrain_y)

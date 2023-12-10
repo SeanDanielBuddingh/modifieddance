@@ -142,9 +142,10 @@ class ACTINN(BaseClassificationMethod):
             Random seed, if set to None, then random.
 
         """
-        input_dim, output_dim = x_train.shape[1], y_train.shape[1]
+        input_dim, output_dim = x_train.shape[1], len(set(y_train))#y_train.shape[1]
         x_train = x_train.clone().detach().float().to(self.device)  # cells by genes
-        y_train = torch.where(y_train)[1].to(self.device)  # cells
+        #y_train = torch.where(y_train)[1].to(self.device)  # cells # classes are already indicies for w2v
+
 
         # Initialize weights, optimizer, and scheduler
         self.model = VanillaMLP(input_dim, output_dim, hidden_dims=self.hidden_dims, device=self.device)

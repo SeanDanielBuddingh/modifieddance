@@ -18,6 +18,8 @@ import gc
 from scipy.sparse import csr_matrix
 import dgl
 import copy
+import pandas as pd
+from torch.utils.data import DataLoader
 
 #ScDeepSort Imports
 from dance.modules.single_modality.cell_type_annotation.scdeepsort import ScDeepSort
@@ -58,27 +60,34 @@ class WordSAGE(torch.nn.Module):
     def read_data(self, seed):
         data = data_pre()
         inputs, targets, genes, normalized_raw_data, test, y_test = data.read_w2v()
-        encoding = np.hstack([targets, y_test])
+        encoding = np.vstack([targets, y_test])
         print(len(np.unique(encoding)))
+        inputs = inputs.reset_index(drop=True)
+        test = test.reset_index(drop=True)
+        normalized_raw_data = normalized_raw_data.reset_index(drop=True)
         label_encoder = LabelEncoder().fit(encoding)
-        targets_encoded = label_encoder.transform(targets)
-        test_encoded = label_encoder.transform(y_test)
+        targets_encoded = pd.Series(label_encoder.transform(targets))
+        test_encoded = pd.Series(label_encoder.transform(y_test))
+        print(set(targets_encoded))
+        #pd.set_option('display.max_rows', None)
+        #print(inputs.iloc[100, :])
         #train_inputs, train_targets, test_inputs, test_targets = mix_data(seed, inputs, targets_encoded)
         train_inputs, train_targets = self.mix_data(seed, inputs, targets_encoded)
         test_inputs, test_targets = self.mix_data(seed, test, test_encoded)
-        train_graph, train_nodes = self.basic_graph(train_inputs, genes, normalized_raw_data)
-        gc.collect()
-        test_graph, test_nodes = self.basic_graph(test_inputs, genes, normalized_raw_data)
-        gc.collect()
-        return train_graph, train_targets, test_graph, test_targets, train_nodes, test_nodes
+        #train_graph, train_nodes = self.basic_graph(train_inputs, genes, normalized_raw_data)
+        #gc.collect()
+        #test_graph, test_nodes = self.basic_graph(test_inputs, genes, normalized_raw_data)
+        #gc.collect()
+        #return train_graph, train_targets, test_graph, test_targets, train_nodes, test_nodes
+        return train_inputs, train_targets, test_inputs, test_targets
 
     def basic_graph(self, train_inputs, genes, normalized):
         G = nx.Graph()
         for i in range(len(train_inputs)):
-                G.add_node(i, features=train_inputs[i])
+                G.add_node(i, features=train_inputs.iloc[i, :])
         nodes = int(G.number_of_nodes())
         for i in range(len(genes)):
-                G.add_node(nodes+i, features=genes[i, 1:])
+                G.add_node(nodes+i, features=genes.iloc[i, 1:])
         for cell_name in normalized:
             if cell_name == '':
                 pass
@@ -96,8 +105,8 @@ class WordSAGE(torch.nn.Module):
             torch.Size(adj.shape)                        
         )
         edge_index = torch.tensor(list(G.edges), dtype=torch.long).t().contiguous()
-        x_numpy = np.array([G.nodes[i]['features'] for i in G.nodes])
-        x = torch.tensor(x_numpy, dtype=torch.float)
+        x_list = [G.nodes[i]['features'] for i in G.nodes]
+        x = torch.tensor(x_list, dtype=torch.float)
 
         return Data(x=x, edge_index=edge_index, adj_matrix=adj_tensor), nodes
 
@@ -146,7 +155,7 @@ class WordSAGE(torch.nn.Module):
         gc.collect()
 
         return G, num_train_nodes
-
+    '''
     def mix_data(self, seed, inputs, targets):
         np.random.seed(seed)
         np.random.shuffle(inputs)
@@ -157,9 +166,24 @@ class WordSAGE(torch.nn.Module):
         #return train_x, train_y, test_x, test_y
 
         return inputs, targets
+    '''
+    def mix_data(self, seed, inputs, targets):
+        np.random.seed(seed)
+        
+        # Concatenate inputs and targets horizontally
+        combined = pd.concat([inputs, targets], axis=1)
+        
+        # Shuffle the rows
+        combined_shuffled = combined.sample(frac=1).reset_index(drop=True)
+        
+        # Split back into inputs and targets
+        num_input_columns = inputs.shape[1]
+        inputs_shuffled = combined_shuffled.iloc[:, :num_input_columns]
+        targets_shuffled = combined_shuffled.iloc[:, num_input_columns:]
 
+        return inputs_shuffled, targets_shuffled
 
-
+'''
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 seed = 42
 set_seed(42)
@@ -169,8 +193,13 @@ out_channels = 100
 num_classes = 16
 model = WordSAGE(in_channels, hidden_channels, out_channels, num_classes).to(device)
 train_graph, train_targets, test_graph, test_targets, train_nodes, test_nodes = WordSAGE.read_data(self=model, seed=seed)
-train_targets = torch.tensor(train_targets, dtype=torch.long)
-test_targets = torch.tensor(test_targets, dtype=torch.long)
+
+train_targets = torch.as_tensor(list(train_targets[0]), dtype=torch.long)
+test_targets = torch.as_tensor(list(test_targets[0]), dtype=torch.long)
+train_graph.y = train_targets
+test_graph.y = test_targets
+#train_batches = DataLoader(train_graph, batch_size=32, shuffle=True)
+#test_batches = DataLoader(test_graph, batch_size=32, shuffle=True)
 
 criterion = torch.nn.CrossEntropyLoss()
 optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
@@ -180,29 +209,42 @@ test_input_nodes = [i for i in range(test_graph.num_nodes) if i < test_nodes]
 
 train_graph = train_graph.to(device)
 test_graph = test_graph.to(device)
-train_input_nodes = torch.tensor(train_input_nodes, dtype=torch.long).to(device)
-test_input_nodes = torch.tensor(test_input_nodes, dtype=torch.long).to(device)
-train_targets = torch.tensor(train_targets, dtype=torch.long).to(device)
-test_targets = torch.tensor(test_targets, dtype=torch.long).to(device)
+train_input_nodes = torch.as_tensor(train_input_nodes, dtype=torch.long).to(device)
+test_input_nodes = torch.as_tensor(test_input_nodes, dtype=torch.long).to(device)
 
 for epoch in range(300):
+    #loss_list = []
+    #for batch in train_batches:
+
     model.train()
     optimizer.zero_grad()
     out = model(train_graph.x, train_graph.edge_index)
-    loss = criterion(out[train_input_nodes], train_targets)
+    loss = criterion(out[train_input_nodes], train_graph.y)
+    #loss_list.extend(loss)
     loss.backward()
     optimizer.step()
 
+    #loss = np.mean(loss_list)
+
 model.eval()
 with torch.no_grad():
+    #acc_list, test_loss_list = [], []
+    #for batch in test_batches:
+
     test_out = model(test_graph.x, test_graph.edge_index)
-    test_loss = criterion(test_out[test_input_nodes], test_targets)
+    test_loss = criterion(test_out[test_input_nodes], test_graph.y)
+    #test_loss_list.extend(test_loss)
     test_out = F.softmax(test_out)
     predicted = torch.argmax(test_out[test_input_nodes], 1)
+    #torch.set_printoptions(threshold=10_000)
     print(predicted)
     print(test_targets)
-    acc = accuracy_score(test_targets.cpu(), predicted.cpu())
-    
-    print(f"Epoch {epoch+1}, Train Loss: {loss.item()}, Test Loss: {test_loss.item()}, Test ACC: {acc}")
+    acc = accuracy_score(test_graph.y.cpu(), predicted.cpu())
+    #acc_list.extend(acc)
 
+    #acc = np.mean(acc_list)
+    #test_loss = np.mean(test_loss_list)
+
+    print(f"Epoch {epoch+1}, Train Loss: {loss.item()}, Test Loss: {test_loss.item()}, Test ACC: {acc}")
+'''
 
