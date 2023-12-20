@@ -60,19 +60,22 @@ class WordSAGE(torch.nn.Module):
 
     def read_data(self, seed):
         data = data_pre()
-        tissue, y_values, genes, normalized = data.read_w2v()
-        print(len(np.unique(y_values)))
-        tissue = tissue.reset_index(drop=True)
-        normalized = normalized.reset_index(drop=True)
-        label_encoder = LabelEncoder().fit(y_values)
-        targets_encoded = pd.Series(label_encoder.transform(y_values))
-        print(set(targets_encoded))
-        inputs, targets = self.mix_data(seed, tissue, targets_encoded)
-        X_train, X_test, y_train, y_test = train_test_split(inputs, targets, test_size=0.2, random_state=seed, stratify=targets)
-        train_graph, train_nodes = self.basic_dgl_graph(X_train, genes, normalized)
-        test_graph, test_nodes = self.basic_dgl_graph(X_test, genes, normalized)
-        #return X_train, X_test, y_train, y_test
-        return train_graph, y_train, test_graph, y_test, train_nodes, test_nodes
+        tissue_train, tissue_test, genes, y_values_train, y_values_test, normalized_train, normalized_test = data.read_w2v()
+        print(len(np.unique(y_values_train)))
+        tissue_train = tissue_train.reset_index(drop=True)
+        tissue_test = tissue_test.reset_index(drop=True)
+        normalized_train = normalized_train.reset_index(drop=True)
+        normalized_test = normalized_test.reset_index(drop=True)
+        label_encoder = LabelEncoder().fit(y_values_train)
+        targets_encoded_train = pd.Series(label_encoder.transform(y_values_train))
+        targets_encoded_test = pd.Series(label_encoder.transform(y_values_test))
+        print(set(targets_encoded_train))
+        inputs_train, targets_train = self.mix_data(seed, tissue_train, targets_encoded_train)
+        inputs_test, targets_test = self.mix_data(seed, tissue_test, targets_encoded_test)
+        #train_graph, train_nodes = self.basic_dgl_graph(X_train, genes, normalized)
+        #test_graph, test_nodes = self.basic_dgl_graph(X_test, genes, normalized)
+        return inputs_train, inputs_test, targets_train, targets_test
+        #return train_graph, y_train, test_graph, y_test, train_nodes, test_nodes
     
     def basic_graph(self, train_inputs, genes, normalized):
         G = nx.Graph()
@@ -151,18 +154,18 @@ class WordSAGE(torch.nn.Module):
 
     def mix_data(self, seed, inputs, targets):
         np.random.seed(seed)
-        
-        combined = pd.concat([inputs, targets], axis=1)
-        
+
+        combined = inputs
+        combined['targets'] = targets.values
         combined_shuffled = combined.sample(frac=1).reset_index(drop=True)
 
-        num_input_columns = inputs.shape[1]
+        num_input_columns = inputs.shape[1] - 1
         inputs_shuffled = combined_shuffled.iloc[:, :num_input_columns]
         targets_shuffled = combined_shuffled.iloc[:, num_input_columns:]
-
+        targets_shuffled.columns = [0]
         return inputs_shuffled, targets_shuffled
 
-
+'''
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 seed = 42
 set_seed(42)
@@ -221,5 +224,5 @@ with torch.no_grad():
     print(f"Precision: {precision}")
     print(f"Recall: {recall}")
     print(f"Specificity: {specificity}")
-
+'''
 

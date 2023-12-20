@@ -9,6 +9,7 @@ os.environ['DGLBACKEND'] = 'pytorch'
 import torch
 import numpy as np
 import pandas as pd
+from sklearn.model_selection import train_test_split
 
 from gensim.models import Word2Vec
 from transformers import BertTokenizer, BertModel
@@ -17,7 +18,7 @@ from transformers import BertTokenizer, BertModel
 
 class data_pre():
     def __init__(self):
-        
+        self.seed = 42
         current_script_path = __file__
         current_dir = os.path.dirname(current_script_path)
         parent_dir = os.path.dirname(current_dir)
@@ -29,9 +30,9 @@ class data_pre():
         
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
-        #combined_brain, combined_brain_labels, corpus_combined_brain, combined_spleen, combined_spleen_labels, corpus_combined_spleen, combined_kidney, combined_kidney_labels, corpus_combined_kidney = self.load_data()
+        #brain_train, brain_test, brain_train_labels, brain_test_labels, corpus_train_brain, spleen_train, spleen_test, spleen_train_labels, spleen_test_labels, corpus_train_spleen, kidney_train, kidney_test, kidney_train_labels, kidney_test_labels, corpus_train_kidney = self.load_data()
         
-        #self.get_w2v(combined_brain, combined_brain_labels, corpus_combined_brain, combined_spleen, combined_spleen_labels, corpus_combined_spleen, combined_kidney, combined_kidney_labels, corpus_combined_kidney)
+        #self.get_w2v(brain_train, brain_test, brain_train_labels, brain_test_labels, corpus_train_brain, spleen_train, spleen_test, spleen_train_labels, spleen_test_labels, corpus_train_spleen, kidney_train, kidney_test, kidney_train_labels, kidney_test_labels, corpus_train_kidney)
 
         #self.bert_embed(brain_test, corpus_brain, brain_y)
         #self.bert_embed(spleen_x, corpus_spleen, spleen_y)
@@ -82,13 +83,19 @@ class data_pre():
         high_std_percentile = np.percentile(row_stds, 99)
         combined_brain_filtered = combined_brain[(row_stds > low_std_percentile) & (row_stds < high_std_percentile)]
      
-        combined_brain_filtered.to_csv(self.path+'/normalized_brain.csv', index=True, header=True)
+        brain_train, brain_test, brain_train_labels, brain_test_labels = train_test_split(combined_brain_filtered.T, combined_brain_labels, test_size=0.2, random_state=self.seed, stratify=combined_brain_labels)
 
-        corpus_combined_brain = []
-        for c_name in combined_brain_filtered.columns:
-            cell = combined_brain_filtered[c_name]
-            sorted = cell[cell!=0].sort_values(ascending=True)
-            corpus_combined_brain.append(sorted.index.tolist())
+        brain_train=brain_train.T
+        brain_test = brain_test.T
+
+        brain_train.to_csv(self.path+'/normalized_brain_train.csv', index=True, header=True)
+        brain_test.to_csv(self.path+'/normalized_brain_test.csv', index=True, header=True)      
+
+        corpus_train_brain = []
+        for c_name in brain_train.columns:
+            cell = brain_train[c_name]
+            sorted = cell[cell!=0].sort_values(ascending=False)
+            corpus_train_brain.append(sorted.index.tolist())
 
         spleen_train = pd.read_csv(self.path+'/train/mouse/mouse_Spleen1970_data.csv', header=0, index_col=0)
         spleen_train_y = pd.read_csv(self.path+'/train/mouse/mouse_Spleen1970_celltype.csv')['Cell_type'].reset_index(drop=True)
@@ -118,13 +125,18 @@ class data_pre():
         high_std_percentile = np.percentile(row_stds, 99)
         combined_spleen_filtered = combined_spleen[(row_stds > low_std_percentile) & (row_stds < high_std_percentile)]
 
-        combined_spleen_filtered.to_csv(self.path+'/normalized_spleen.csv', index=True, header=True)
+        spleen_train, spleen_test, spleen_train_labels, spleen_test_labels = train_test_split(combined_spleen_filtered.T, combined_spleen_labels, test_size=0.2, random_state=self.seed, stratify=combined_spleen_labels)
+        spleen_train = spleen_train.T
+        spleen_test = spleen_test.T
 
-        corpus_combined_spleen = []
-        for c_name in combined_spleen_filtered:
-            cell = combined_spleen_filtered[c_name]
-            sorted = cell[cell!=0].sort_values(ascending=True)
-            corpus_combined_spleen.append(sorted.index.tolist())
+        spleen_train.to_csv(self.path+'/normalized_spleen_train.csv', index=True, header=True)
+        spleen_test.to_csv(self.path+'/normalized_spleen_test.csv', index=True, header=True)      
+
+        corpus_train_spleen = []
+        for c_name in spleen_train.columns:
+            cell = spleen_train[c_name]
+            sorted = cell[cell!=0].sort_values(ascending=False)
+            corpus_train_spleen.append(sorted.index.tolist())
 
         kidney_train = pd.read_csv(self.path+'/train/mouse/mouse_Kidney4682_data.csv', header=0, index_col=0).fillna(0)
         kidney_train_y = pd.read_csv(self.path+'/train/mouse/mouse_Kidney4682_celltype.csv')['Cell_type'].reset_index(drop=True)
@@ -153,92 +165,112 @@ class data_pre():
         high_std_percentile = np.percentile(row_stds, 99)
         combined_kidney_filtered = combined_kidney[(row_stds > low_std_percentile) & (row_stds < high_std_percentile)]
         
-        combined_kidney_filtered.to_csv(self.path+'/normalized_kidney.csv', index=True, header=True)
+        kidney_train, kidney_test, kidney_train_labels, kidney_test_labels = train_test_split(combined_kidney_filtered.T, combined_kidney_labels, test_size=0.2, random_state=self.seed, stratify=combined_kidney_labels)
+        kidney_train = kidney_train.T
+        kidney_test = kidney_test.T
 
-        corpus_combined_kidney = []
-        for c_name in combined_kidney_filtered.columns:
-            cell = combined_kidney_filtered[c_name]
-            sorted = cell[cell!=0].sort_values(ascending=True)
-            corpus_combined_kidney.append(sorted.index.tolist())
+        kidney_train.to_csv(self.path+'/normalized_kidney_train.csv', index=True, header=True)
+        kidney_test.to_csv(self.path+'/normalized_kidney_test.csv', index=True, header=True)      
+
+        corpus_train_kidney = []
+        for c_name in kidney_train.columns:
+            cell = kidney_train[c_name]
+            sorted = cell[cell!=0].sort_values(ascending=False)
+            corpus_train_kidney.append(sorted.index.tolist())
         
 
-        return combined_brain_filtered, combined_brain_labels, corpus_combined_brain, combined_spleen_filtered, combined_spleen_labels, corpus_combined_spleen, combined_kidney_filtered, combined_kidney_labels, corpus_combined_kidney
+        return brain_train, brain_test, brain_train_labels, brain_test_labels, corpus_train_brain, spleen_train, spleen_test, spleen_train_labels, spleen_test_labels, corpus_train_spleen, kidney_train, kidney_test, kidney_train_labels, kidney_test_labels, corpus_train_kidney
 
-    def get_w2v(self, combined_brain, combined_brain_labels, corpus_combined_brain, combined_spleen, combined_spleen_labels, corpus_combined_spleen, combined_kidney, combined_kidney_labels, corpus_combined_kidney):
+    def get_w2v(self, brain_train, brain_test, brain_train_labels, brain_test_labels, corpus_train_brain, spleen_train, spleen_test, spleen_train_labels, spleen_test_labels, corpus_train_spleen, kidney_train, kidney_test, kidney_train_labels, kidney_test_labels, corpus_train_kidney):
 
-        b_w2v = self.w2v_embed(corpus_combined_brain).wv
-        b_matrix = np.zeros((len(combined_brain), b_w2v.vector_size))
+        b_w2v = self.w2v_embed(corpus_train_brain).wv
+        b_matrix = np.zeros((len(brain_train), b_w2v.vector_size))
 
-        for i, gene in enumerate(combined_brain.index):
+        for i, gene in enumerate(brain_train.index):
             try:
                 b_matrix[i] = b_w2v[gene]
             except KeyError:
                 b_matrix[i] = np.zeros(b_w2v.vector_size)
 
-        b_cells = combined_brain.T.values @ b_matrix
+        b_cells = brain_train.T.values @ b_matrix
         b_cells = pd.DataFrame(b_cells)
-        b_cells.to_csv(self.path+'/brain.csv', index=False, header=False)
+        b_cells.to_csv(self.path+'/brain_train.csv', index=False, header=False)
+
+        b_te_cells = brain_test.T.values @ b_matrix
+        b_te_cells = pd.DataFrame(b_te_cells)
+        b_te_cells.to_csv(self.path+'/brain_test.csv', index=False, header=False)
+
         brain_genes = pd.DataFrame(b_matrix)
-        brain_genes.index = combined_brain.index 
+        brain_genes.index = brain_train.index 
         brain_genes.to_csv(self.path+'/brain_w2v_genes.csv', index=True, header=False)
 
-        s_w2v = self.w2v_embed(corpus_combined_spleen).wv
-        s_matrix = np.zeros((len(combined_spleen), s_w2v.vector_size))
-        
-        for i, gene in enumerate(combined_spleen.index):
+        s_w2v = self.w2v_embed(corpus_train_spleen).wv
+        s_matrix = np.zeros((len(spleen_train), s_w2v.vector_size))
+
+        for i, gene in enumerate(spleen_train.index):
             try:
                 s_matrix[i] = s_w2v[gene]
             except KeyError:
                 s_matrix[i] = np.zeros(s_w2v.vector_size)
 
-        s_cells = combined_spleen.T.values @ s_matrix
+        s_cells = spleen_train.T.values @ s_matrix
         s_cells = pd.DataFrame(s_cells)
-        s_cells.to_csv(self.path+'/spleen.csv', index=False, header=False)
+        s_cells.to_csv(self.path+'/spleen_train.csv', index=False, header=False)
+
+        s_te_cells = spleen_test.T.values @ s_matrix
+        s_te_cells = pd.DataFrame(s_te_cells)
+        s_te_cells.to_csv(self.path+'/spleen_test.csv', index=False, header=False)
+
         spleen_genes = pd.DataFrame(s_matrix)
-        spleen_genes.index = combined_spleen.index
+        spleen_genes.index = spleen_train.index 
         spleen_genes.to_csv(self.path+'/spleen_w2v_genes.csv', index=True, header=False)
 
-        k_w2v = self.w2v_embed(corpus_combined_kidney).wv
-        k_matrix = np.zeros((len(combined_kidney), k_w2v.vector_size))
+        k_w2v = self.w2v_embed(corpus_train_kidney).wv
+        k_matrix = np.zeros((len(kidney_train), k_w2v.vector_size))
 
-        for i, gene in enumerate(combined_kidney.index):
+        for i, gene in enumerate(kidney_train.index):
             try:
                 k_matrix[i] = k_w2v[gene]
             except KeyError:
                 k_matrix[i] = np.zeros(k_w2v.vector_size)
 
-        k_cells = combined_kidney.T.values @ k_matrix
+        k_cells = kidney_train.T.values @ k_matrix
         k_cells = pd.DataFrame(k_cells)
-        k_cells.to_csv(self.path+'/kidney.csv', index=False, header=False)
+        k_cells.to_csv(self.path+'/kidney_train.csv', index=False, header=False)
+
+        k_te_cells = kidney_test.T.values @ k_matrix
+        k_te_cells = pd.DataFrame(k_te_cells)
+        k_te_cells.to_csv(self.path+'/kidney_test.csv', index=False, header=False)
+
         kidney_genes = pd.DataFrame(k_matrix)
-        kidney_genes.index = combined_kidney.index
+        kidney_genes.index = kidney_train.index 
         kidney_genes.to_csv(self.path+'/kidney_w2v_genes.csv', index=True, header=False)
 
-        y_all = pd.Series()
-        embeddings = np.vstack([b_cells, s_cells, k_cells])
-        embeddings = pd.DataFrame(embeddings)
-        embeddings.to_csv(self.path+'/combined_embeddings.csv', index=False)
-        y_all = pd.concat([combined_brain_labels, combined_spleen_labels, combined_kidney_labels])
-        y_all.to_csv(self.path+'/y_train.csv', index=False)
-        combined_brain_labels.to_csv(self.path+'/brain_y.csv', index=False)
-        combined_spleen_labels.to_csv(self.path+'/spleen_y.csv', index=False)
-        combined_kidney_labels.to_csv(self.path+'/kidney_y.csv', index=False)
+        brain_train_labels.to_csv(self.path+'/brain_train_labels.csv', index=False)
+        brain_test_labels.to_csv(self.path+'/brain_test_labels.csv', index=False)
+        spleen_train_labels.to_csv(self.path+'/spleen_train_labels.csv', index=False)
+        spleen_test_labels.to_csv(self.path+'/spleen_test_labels.csv', index=False)
+        kidney_train_labels.to_csv(self.path+'/kidney_train_labels.csv', index=False)
+        kidney_test_labels.to_csv(self.path+'/kidney_test_labels.csv', index=False)
 
         print('printed')
 
     def read_w2v(self):
-        tissue = pd.read_csv(self.path+'/brain.csv', header=None)
+        tissue_train = pd.read_csv(self.path+'/brain_train.csv', header=None)
+        tissue_test = pd.read_csv(self.path+'/brain_test.csv', header=None)
         genes = pd.read_csv(self.path+'/brain_w2v_genes.csv', header=None)
-        y_values = pd.read_csv(self.path+'/brain_y.csv', skiprows=1, header=None, dtype=str)
-        normalized = pd.read_csv(self.path+'/normalized_brain.csv', header=0, index_col=0)
+        y_values_train = pd.read_csv(self.path+'/brain_train_labels.csv', skiprows=1, header=None, dtype=str)
+        y_values_test = pd.read_csv(self.path+'/brain_test_labels.csv', skiprows=1, header=None, dtype=str)
+        normalized_train = pd.read_csv(self.path+'/normalized_brain_train.csv', header=0, index_col=0)
+        normalized_test = pd.read_csv(self.path+'/normalized_brain_test.csv', header=0, index_col=0)
 
-        return tissue, y_values, genes, normalized
+        return tissue_train, tissue_test, genes, y_values_train, y_values_test, normalized_train, normalized_test
     
     def w2v_embed(self, corpus):
         '''
         Word2Vec Embeddings
         '''
-        w2v_embed = Word2Vec(corpus, min_count=1)
+        w2v_embed = Word2Vec(corpus, min_count=1, vector_size=500)
         return w2v_embed
     
     @torch.no_grad()

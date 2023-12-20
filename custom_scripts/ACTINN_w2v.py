@@ -46,7 +46,7 @@ out_channels = 100
 num_classes = 16
 model = WordSAGE(in_channels, hidden_channels, out_channels, num_classes).to(device)
 train_inputs, test_inputs, train_targets, test_targets = WordSAGE.read_data(self=model, seed=seed)
-
+#print(train_inputs)
 train_targets = torch.tensor(train_targets[0].values, dtype=torch.long).to(device)
 test_targets = torch.tensor(test_targets[0].values, dtype=torch.long).to(device)
 print(test_targets)
@@ -59,7 +59,7 @@ print(train_targets.size())
 print(torch.cuda.is_available())
 print(torch.cuda.get_device_name(0))
 
-model = ACTINN(hidden_dims=[100, 100], lambd=0.01, device='cuda')
+model = ACTINN(lambd=0.01, device='cuda')
 
 model.fit(train_inputs, train_targets, lr=0.001, num_epochs=300,
           batch_size=1000, print_cost=True)

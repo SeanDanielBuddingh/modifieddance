@@ -165,9 +165,10 @@ def mix_data(seed, inputs, targets):
 
 
 #ACTINN
+set_seed(42)
 print(torch.cuda.is_available())
 device=torch.device('cuda')
-model = ACTINN(hidden_dims=[256, 256], lambd=0.01, device='cuda')
+model = ACTINN(lambd=0.01, device='cuda')
 
 preprocessing_pipeline = model.preprocessing_pipeline(normalize=True, filter_genes=True)
 dataset = ScDeepSortDataset(species="mouse", tissue="Brain",
@@ -179,6 +180,8 @@ x_test, y_test = data.get_test_data(return_type="torch")
 seed = 42
 y_train = torch.argmax(y_train, dim=1)
 y_test = torch.argmax(y_test, dim=1)
+print(torch.unique(y_train))
+print(torch.unique(y_test))
 
 combined = torch.cat((x_train, x_test), dim=0)
 y_comb = torch.cat((y_train, y_test), dim=0)
@@ -193,13 +196,12 @@ y_test = torch.tensor(y_test[0].values, dtype=torch.long).to(device)
 x_train = torch.tensor(x_train.to_numpy(), dtype=torch.float32).to(device)
 x_test = torch.tensor(x_test.to_numpy(), dtype=torch.float32).to(device)
 
-set_seed(42)
-
-x_train.to(device)
-y_train.to(device)
-x_test.to(device)
-y_test.to(device)
+x_train = x_train.to(device)
+y_train = y_train.to(device)
+x_test = x_test.to(device)
+y_test = y_test.to(device)
 print(y_test.shape)
+print(F.one_hot(y_test, num_classes=16).cpu().shape)
 
 model.fit(x_train, y_train, lr=0.001, num_epochs=300,
           batch_size=1000, print_cost=True)
