@@ -1,3 +1,13 @@
+import sys
+import os
+
+current_script_path = __file__
+current_dir = os.path.dirname(current_script_path)
+parent_dir = os.path.dirname(current_dir)
+sys.path.append(parent_dir)
+parent_parent = os.path.dirname(parent_dir)
+data_dir_ = parent_parent+'/dance_data'
+
 import torch
 import torch.nn.functional as F
 import numpy as np
@@ -13,11 +23,13 @@ from scipy.sparse import csr_matrix
 import dgl
 import copy
 
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import roc_auc_score, f1_score, precision_score, recall_score, confusion_matrix
+
 #ScDeepSort Imports
 from dance.modules.single_modality.cell_type_annotation.scdeepsort import ScDeepSort
 from dance.utils import set_seed
 
-import os
 os.environ["DGLBACKEND"] = "pytorch"
 from pprint import pprint
 from dance.datasets.singlemodality import ScDeepSortDataset
@@ -32,49 +44,58 @@ from dance.typing import LogLevel, Optional
 from dance.modules.single_modality.cell_type_annotation.actinn import ACTINN
 
 #Celltypist
-from dance.modules.single_modality.cell_type_annotation.celltypist import Celltypist
+from dance.modules.single_modality.cell_type_annotation.celltypist import Celltypist, Classifier
+
 
 from WordSage import WordSAGE
 
+#Celltypist
+
+device = torch.device('cpu' if torch.cuda.is_available() else 'cpu')
+seed = 42
+set_seed(42)
 in_channels = 100
 hidden_channels = 100
 out_channels = 100
-num_classes = 21
-WordSage = WordSAGE(in_channels, hidden_channels, out_channels, num_classes)
-device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-seed = 42
-set_seed(42)
-data = data_pre()
-inputs, targets, genes, normalized_raw_data, test, y_test = data.read_w2v()
+num_classes = 16
+model = WordSAGE(in_channels, hidden_channels, out_channels, num_classes).to(device)
+x_train, x_test, y_train, y_test = WordSAGE.read_data(self=model, seed=seed)
 
-WordSage = WordSAGE(in_channels, hidden_channels, out_channels, num_classes)
+y_train = torch.tensor(y_train[0].values, dtype=torch.long).to(device)
+y_test = torch.tensor(y_test[0].values, dtype=torch.long).to(device)
 
-encoding = np.hstack([targets, y_test])
-label_encoder = LabelEncoder().fit(encoding)
-targets_encoded = label_encoder.transform(targets)
-targets_encoded = torch.tensor(targets_encoded, dtype=torch.long)
-num_classes = max(targets_encoded)+1
-#targets_encoded = F.one_hot(targets_encoded, num_classes=num_classes)
-test_encoded = label_encoder.transform(y_test)
-test_encoded = torch.tensor(test_encoded, dtype=torch.long)
-#test_encoded = F.one_hot(test_encoded, num_classes=num_classes)
-#train_inputs, train_targets, test_inputs, test_targets = mix_data(seed, inputs, targets_encoded)
-train_inputs, train_targets = WordSage.mix_data(seed, inputs, targets_encoded)
-test_inputs, test_targets = WordSage.mix_data(seed, test, test_encoded)
-train_inputs = torch.tensor(train_inputs, dtype=torch.float32).numpy()
-test_inputs = torch.tensor(test_inputs, dtype=torch.float32).numpy() 
+x_train = torch.tensor(x_train.to_numpy(), dtype=torch.float32).to(device)
+x_test = torch.tensor(x_test.to_numpy(), dtype=torch.float32).to(device)
 
-
-#Celltypist
 model = Celltypist(majority_voting = False)
-model.fit(indata = train_inputs, labels=train_targets)
-result = model.predict(test_inputs)
-result = torch.tensor(result)
-predicted = result#torch.argmax(result, 1)
-print(predicted)
-y_test = test_targets
-correct = (predicted == y_test).sum().item()
-total = y_test.numel()
-accuracy = correct / total
-print('accuracy: ', accuracy)
+set_seed(42)
+
+x_train.to(device)
+y_train.to(device)
+x_test.to(device)
+y_test.to(device)
+print(y_test.shape)
+
+model.fit(indata = x_train, labels=y_train)
+
+pred = model.predict(x_test.numpy()) 
+probs = model.classifier.predict_proba(x_test.numpy())
+
+acc = accuracy_score(y_test.cpu(), pred)
+
+macro_auc = roc_auc_score(F.one_hot(y_test, num_classes=16).cpu(), probs, multi_class='ovo', average='macro')
+f1 = f1_score(y_test.cpu(), pred, average='macro')
+precision = precision_score(y_test.cpu(), pred, average='macro')
+recall = recall_score(y_test.cpu(), pred, average='macro')
+
+# For specificity, calculate the confusion matrix and derive specificity
+cm = confusion_matrix(y_test.cpu(), pred)
+specificity = np.sum(np.diag(cm)) / np.sum(cm)
+
+print(f"ACC: {acc}")
+print(f"Macro AUC: {macro_auc}")
+print(f"F1: {f1}")
+print(f"Precision: {precision}")
+print(f"Recall: {recall}")
+print(f"Specificity: {specificity}")
 

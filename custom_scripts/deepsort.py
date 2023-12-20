@@ -16,6 +16,7 @@ import dgl
 import copy
 import gc
 
+from sklearn.metrics import roc_auc_score, f1_score, precision_score, recall_score, confusion_matrix
 
 #ScDeepSort Imports
 from dance.modules.single_modality.cell_type_annotation.scdeepsort import ScDeepSort
@@ -71,13 +72,13 @@ y_test = data.get_test_data(return_type="torch")[1]
 y_train = torch.cat([y_train, y_test], dim=0)
 y_train = torch.argmax(y_train, 1)
 y_test = torch.argmax(y_test, 1)
-print(y_train)
+#print(y_train)
 print(y_test)
-print(data.data.uns['CellFeatureGraph'])
+#print(data.data.uns['CellFeatureGraph'])
 model.fit(graph=data.data.uns["CellFeatureGraph"], labels=y_train)
 train_losses = model.train_losses
 train_accuracies = model.train_accuracies
-
+'''
 plt.figure(figsize=(10, 5))
 plt.subplot(1, 2, 1)
 plt.plot(range(1, 300 + 1), train_losses, label='Train Loss')
@@ -96,15 +97,31 @@ plt.legend()
 
 plt.tight_layout()
 plt.show()
-
-result = model.predict_proba(graph=data.data.uns["CellFeatureGraph"])
+'''
+with torch.no_grad():
+    result = model.predict_proba(graph=data.data.uns["CellFeatureGraph"])
 
 result = result[4682:]
 result = torch.tensor(result)
 predicted = torch.argmax(result, 1)
 #torch.set_printoptions(profile="full")
-print(predicted)
+#print(predicted)
 correct = (predicted == y_test).sum().item()
 total = y_test.numel()
 accuracy = correct / total
-print('accuracy: ', accuracy)
+
+macro_auc = roc_auc_score(data.get_test_data(return_type="torch")[1].cpu(), result.cpu().detach(), multi_class='ovo', average='macro')
+f1 = f1_score(y_test.cpu(), predicted.cpu(), average='macro')
+precision = precision_score(y_test.cpu(), predicted.cpu(), average='macro')
+recall = recall_score(y_test.cpu(), predicted.cpu(), average='macro')
+
+# For specificity, calculate the confusion matrix and derive specificity
+cm = confusion_matrix(y_test.cpu(), predicted.cpu())
+specificity = np.sum(np.diag(cm)) / np.sum(cm)
+
+print(f"ACC: {accuracy}")
+print(f"Macro AUC: {macro_auc}")
+print(f"F1: {f1}")
+print(f"Precision: {precision}")
+print(f"Recall: {recall}")
+print(f"Specificity: {specificity}")

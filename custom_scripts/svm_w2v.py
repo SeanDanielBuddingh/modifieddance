@@ -8,17 +8,41 @@ sys.path.append(parent_dir)
 parent_parent = os.path.dirname(parent_dir)
 data_dir_ = parent_parent+'/dance_data'
 
-from sklearn.model_selection import train_test_split
-from sklearn.metrics import roc_auc_score, f1_score, precision_score, recall_score, confusion_matrix
-from sklearn.metrics import accuracy_score
-
-from dance.datasets.singlemodality import ScDeepSortDataset
-from dance.transforms import AnnDataTransform, SCNFeature
-from dance.modules.single_modality.cell_type_annotation import SingleCellNet
-from dance.utils import set_seed
-import numpy as np
 import torch
 import torch.nn.functional as F
+import numpy as np
+from torch_geometric.nn import SAGEConv
+import networkx as nx
+from data_pre  import data_pre
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import LabelEncoder
+from torch_geometric.data import Data
+from sklearn.metrics import accuracy_score
+import gc
+from scipy.sparse import csr_matrix
+import dgl
+import copy
+
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import roc_auc_score, f1_score, precision_score, recall_score, confusion_matrix
+
+#ScDeepSort Imports
+from dance.modules.single_modality.cell_type_annotation.scdeepsort import ScDeepSort
+from dance.utils import set_seed
+
+os.environ["DGLBACKEND"] = "pytorch"
+from pprint import pprint
+from dance.datasets.singlemodality import ScDeepSortDataset
+
+import scanpy as sc
+from dance.transforms import AnnDataTransform, FilterGenesPercentile
+from dance.transforms import Compose, SetConfig
+from dance.transforms.graph import PCACellFeatureGraph, CellFeatureGraph
+from dance.typing import LogLevel, Optional
+
+#ACTINN
+from dance.modules.single_modality.cell_type_annotation.svm import SVM
+
 
 from WordSage import WordSAGE
 
@@ -35,6 +59,11 @@ def mix_data(seed, inputs, targets):
 
     return inputs_shuffled, targets_shuffled
 
+in_channels = 100
+hidden_channels = 100
+out_channels = 100
+num_classes = 21
+
 device = torch.device('cpu' if torch.cuda.is_available() else 'cpu')
 seed = 42
 set_seed(42)
@@ -50,7 +79,7 @@ y_test = torch.tensor(y_test[0].values, dtype=torch.long).to(device)
 
 x_train = torch.tensor(x_train.to_numpy(), dtype=torch.float32).to(device)
 x_test = torch.tensor(x_test.to_numpy(), dtype=torch.float32).to(device)
-model = SingleCellNet(num_trees=100)
+model = SVM(True)
 set_seed(42)
 
 x_train.to(device)
@@ -59,20 +88,20 @@ x_test.to(device)
 y_test.to(device)
 print(y_test.shape)
 
-model.fit(x_train.numpy(), y_train.numpy())
+model.fit(x= x_train, y=y_train)
 
 pred = model.predict(x_test.numpy()) 
-probs = model.predict_proba(x_test.numpy())
+probs = model._mdl.predict_proba(x_test.numpy())
 
-acc = accuracy_score(y_test.numpy(), pred)
-print(torch.unique(y_test))
+acc = accuracy_score(y_test.cpu(), pred)
+
 macro_auc = roc_auc_score(F.one_hot(y_test, num_classes=16).cpu(), probs, multi_class='ovo', average='macro')
-f1 = f1_score(y_test, pred, average='macro')
-precision = precision_score(y_test, pred, average='macro')
-recall = recall_score(y_test, pred, average='macro')
+f1 = f1_score(y_test.cpu(), pred, average='macro')
+precision = precision_score(y_test.cpu(), pred, average='macro')
+recall = recall_score(y_test.cpu(), pred, average='macro')
 
 # For specificity, calculate the confusion matrix and derive specificity
-cm = confusion_matrix(y_test, pred)
+cm = confusion_matrix(y_test.cpu(), pred)
 specificity = np.sum(np.diag(cm)) / np.sum(cm)
 
 print(f"ACC: {acc}")
@@ -81,3 +110,4 @@ print(f"F1: {f1}")
 print(f"Precision: {precision}")
 print(f"Recall: {recall}")
 print(f"Specificity: {specificity}")
+

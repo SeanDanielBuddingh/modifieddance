@@ -67,7 +67,7 @@ class SingleCellNet(BaseClassificationMethod):
         x_rand = self.randomize(x, num=num_rand)
         x_comb = np.vstack((x, x_rand))
 
-        y_rand = np.ones(x_rand.shape[0]) * (y.max() + 1)
+        y_rand = np.ones(x_rand.shape[0]) * (y.max() )#+ 1)
         y_comb = np.concatenate((y, y_rand))
 
         self.model = RandomForestClassifier(n_estimators=self.num_trees, random_state=random_state,

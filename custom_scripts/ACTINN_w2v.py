@@ -6,6 +6,7 @@ import networkx as nx
 from data_pre  import data_pre
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import LabelEncoder
+from sklearn.metrics import roc_auc_score, f1_score, precision_score, recall_score, confusion_matrix
 from torch_geometric.data import Data
 from sklearn.metrics import accuracy_score
 import gc
@@ -44,12 +45,13 @@ hidden_channels = 100
 out_channels = 100
 num_classes = 16
 model = WordSAGE(in_channels, hidden_channels, out_channels, num_classes).to(device)
-train_inputs, train_targets, test_inputs, test_targets = WordSAGE.read_data(self=model, seed=seed)
-train_targets = torch.as_tensor(list(train_targets[0]), dtype=torch.long).to(device)#.reshape(-1, 1)
-test_targets = torch.as_tensor(list(test_targets[0]), dtype=torch.long).to(device)#.reshape(-1, 1)
+train_inputs, test_inputs, train_targets, test_targets = WordSAGE.read_data(self=model, seed=seed)
 
-train_inputs = torch.as_tensor(train_inputs.to_numpy(), dtype=torch.float32).to(device)
-test_inputs = torch.as_tensor(test_inputs.to_numpy(), dtype=torch.float32).to(device)
+train_targets = torch.tensor(train_targets[0].values, dtype=torch.long).to(device)
+test_targets = torch.tensor(test_targets[0].values, dtype=torch.long).to(device)
+print(test_targets)
+train_inputs = torch.tensor(train_inputs.to_numpy(), dtype=torch.float32).to(device)
+test_inputs = torch.tensor(test_inputs.to_numpy(), dtype=torch.float32).to(device)
 print(train_inputs.size())
 print(train_targets.size())
 
@@ -63,5 +65,23 @@ model.fit(train_inputs, train_targets, lr=0.001, num_epochs=300,
           batch_size=1000, print_cost=True)
 pred = model.predict(test_inputs)
 acc = accuracy_score(test_targets.cpu(), pred.cpu())
+print(set(test_targets.cpu().numpy()))
+print(F.softmax(model.model(test_inputs).cpu()).detach().shape)
+
+macro_auc = roc_auc_score(F.one_hot(test_targets, num_classes=num_classes).cpu(), F.softmax(model.model(test_inputs).cpu()).detach(), multi_class='ovo', average='macro')
+f1 = f1_score(test_targets.cpu(), pred.cpu(), average='macro')
+precision = precision_score(test_targets.cpu(), pred.cpu(), average='macro')
+recall = recall_score(test_targets.cpu(), pred.cpu(), average='macro')
+
+# For specificity, calculate the confusion matrix and derive specificity
+cm = confusion_matrix(test_targets.cpu(), pred.cpu())
+specificity = np.sum(np.diag(cm)) / np.sum(cm)
+
 print(f"ACC: {acc}")
+print(f"Macro AUC: {macro_auc}")
+print(f"F1: {f1}")
+print(f"Precision: {precision}")
+print(f"Recall: {recall}")
+print(f"Specificity: {specificity}")
+
 #print(model.model)
