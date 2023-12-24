@@ -30,9 +30,9 @@ class data_pre():
         
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
-        #brain_train, brain_test, brain_train_labels, brain_test_labels, corpus_train_brain, spleen_train, spleen_test, spleen_train_labels, spleen_test_labels, corpus_train_spleen, kidney_train, kidney_test, kidney_train_labels, kidney_test_labels, corpus_train_kidney = self.load_data()
+        brain_train, brain_test, brain_train_labels, brain_test_labels, corpus_train_brain, spleen_train, spleen_test, spleen_train_labels, spleen_test_labels, corpus_train_spleen, kidney_train, kidney_test, kidney_train_labels, kidney_test_labels, corpus_train_kidney = self.load_data()
         
-        #self.get_w2v(brain_train, brain_test, brain_train_labels, brain_test_labels, corpus_train_brain, spleen_train, spleen_test, spleen_train_labels, spleen_test_labels, corpus_train_spleen, kidney_train, kidney_test, kidney_train_labels, kidney_test_labels, corpus_train_kidney)
+        self.get_w2v(brain_train, brain_test, brain_train_labels, brain_test_labels, corpus_train_brain, spleen_train, spleen_test, spleen_train_labels, spleen_test_labels, corpus_train_spleen, kidney_train, kidney_test, kidney_train_labels, kidney_test_labels, corpus_train_kidney)
 
         #self.bert_embed(brain_test, corpus_brain, brain_y)
         #self.bert_embed(spleen_x, corpus_spleen, spleen_y)
@@ -178,7 +178,7 @@ class data_pre():
             sorted = cell[cell!=0].sort_values(ascending=False)
             corpus_train_kidney.append(sorted.index.tolist())
         
-
+        print('loaded')
         return brain_train, brain_test, brain_train_labels, brain_test_labels, corpus_train_brain, spleen_train, spleen_test, spleen_train_labels, spleen_test_labels, corpus_train_spleen, kidney_train, kidney_test, kidney_train_labels, kidney_test_labels, corpus_train_kidney
 
     def get_w2v(self, brain_train, brain_test, brain_train_labels, brain_test_labels, corpus_train_brain, spleen_train, spleen_test, spleen_train_labels, spleen_test_labels, corpus_train_spleen, kidney_train, kidney_test, kidney_train_labels, kidney_test_labels, corpus_train_kidney):
@@ -191,12 +191,17 @@ class data_pre():
                 b_matrix[i] = b_w2v[gene]
             except KeyError:
                 b_matrix[i] = np.zeros(b_w2v.vector_size)
-
-        b_cells = brain_train.T.values @ b_matrix
+        #print(b_matrix.shape)
+        b_cells = np.array([np.multiply(brain_train.T.iloc[i, :], b_matrix.T[j, :]) 
+                            for i in range(brain_train.T.shape[0]) 
+                            for j in range(b_matrix.T.shape[0])]).mean(axis=1)
+        
         b_cells = pd.DataFrame(b_cells)
         b_cells.to_csv(self.path+'/brain_train.csv', index=False, header=False)
 
-        b_te_cells = brain_test.T.values @ b_matrix
+        b_te_cells = np.array([np.multiply(brain_test.T.iloc[i, :], b_matrix.T[j, :])
+                            for i in range(brain_test.T.shape[0]) 
+                            for j in range(b_matrix.T.shape[0])]).mean(axis=1)
         b_te_cells = pd.DataFrame(b_te_cells)
         b_te_cells.to_csv(self.path+'/brain_test.csv', index=False, header=False)
 
@@ -213,11 +218,15 @@ class data_pre():
             except KeyError:
                 s_matrix[i] = np.zeros(s_w2v.vector_size)
 
-        s_cells = spleen_train.T.values @ s_matrix
+        s_cells = np.array([np.multiply(spleen_train.T.iloc[i, :], s_matrix.T[j, :])
+                            for i in range(spleen_train.T.shape[0]) 
+                            for j in range(s_matrix.T.shape[0])]).mean(axis=1)
         s_cells = pd.DataFrame(s_cells)
         s_cells.to_csv(self.path+'/spleen_train.csv', index=False, header=False)
 
-        s_te_cells = spleen_test.T.values @ s_matrix
+        s_te_cells = np.array([np.multiply(spleen_test.T.iloc[i, :], s_matrix.T[j, :])
+                            for i in range(spleen_test.T.shape[0]) 
+                            for j in range(s_matrix.T.shape[0])]).mean(axis=1)
         s_te_cells = pd.DataFrame(s_te_cells)
         s_te_cells.to_csv(self.path+'/spleen_test.csv', index=False, header=False)
 
@@ -234,11 +243,15 @@ class data_pre():
             except KeyError:
                 k_matrix[i] = np.zeros(k_w2v.vector_size)
 
-        k_cells = kidney_train.T.values @ k_matrix
+        k_cells = np.array([np.multiply(kidney_train.T.iloc[i, :], k_matrix.T[j, :])
+                            for i in range(kidney_train.T.shape[0]) 
+                            for j in range(k_matrix.T.shape[0])]).mean(axis=1)
         k_cells = pd.DataFrame(k_cells)
         k_cells.to_csv(self.path+'/kidney_train.csv', index=False, header=False)
 
-        k_te_cells = kidney_test.T.values @ k_matrix
+        k_te_cells = np.array([np.multiply(kidney_test.T.iloc[i, :], k_matrix.T[j, :])
+                            for i in range(kidney_test.T.shape[0]) 
+                            for j in range(k_matrix.T.shape[0])]).mean(axis=1)
         k_te_cells = pd.DataFrame(k_te_cells)
         k_te_cells.to_csv(self.path+'/kidney_test.csv', index=False, header=False)
 
@@ -290,4 +303,4 @@ class data_pre():
         print(outputs)
         return outputs
 
-#data = data_pre()
+data = data_pre()
