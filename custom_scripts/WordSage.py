@@ -61,6 +61,8 @@ class WordSAGE(torch.nn.Module):
     def read_data(self, seed):
         data = data_pre()
         tissue_train, tissue_test, genes, y_values_train, y_values_test, normalized_train, normalized_test = data.read_w2v()
+        normalized_train = normalized_train.T
+        normalized_test = normalized_test.T
         print(len(np.unique(y_values_train)))
         tissue_train = tissue_train.reset_index(drop=True)
         tissue_test = tissue_test.reset_index(drop=True)

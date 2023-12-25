@@ -10,6 +10,7 @@ import torch
 import numpy as np
 import pandas as pd
 from sklearn.model_selection import train_test_split
+from sklearn.decomposition import PCA
 
 from gensim.models import Word2Vec
 from transformers import BertTokenizer, BertModel
@@ -19,6 +20,8 @@ from transformers import BertTokenizer, BertModel
 class data_pre():
     def __init__(self):
         self.seed = 42
+        self.dimensions = 500 
+
         current_script_path = __file__
         current_dir = os.path.dirname(current_script_path)
         parent_dir = os.path.dirname(current_dir)
@@ -30,9 +33,9 @@ class data_pre():
         
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
-        brain_train, brain_test, brain_train_labels, brain_test_labels, corpus_train_brain, spleen_train, spleen_test, spleen_train_labels, spleen_test_labels, corpus_train_spleen, kidney_train, kidney_test, kidney_train_labels, kidney_test_labels, corpus_train_kidney = self.load_data()
+        #brain_train, brain_test, brain_train_pca, brain_test_pca, brain_train_labels, brain_test_labels, corpus_train_brain, spleen_train, spleen_test, spleen_train_pca, spleen_test_pca, spleen_train_labels, spleen_test_labels, corpus_train_spleen, kidney_train, kidney_test, kidney_train_pca, kidney_test_pca, kidney_train_labels, kidney_test_labels, corpus_train_kidney = self.load_data()
         
-        self.get_w2v(brain_train, brain_test, brain_train_labels, brain_test_labels, corpus_train_brain, spleen_train, spleen_test, spleen_train_labels, spleen_test_labels, corpus_train_spleen, kidney_train, kidney_test, kidney_train_labels, kidney_test_labels, corpus_train_kidney)
+        #self.get_w2v(brain_train, brain_test, brain_train_pca, brain_test_pca, brain_train_labels, brain_test_labels, corpus_train_brain, spleen_train, spleen_test, spleen_train_pca, spleen_test_pca, spleen_train_labels, spleen_test_labels, corpus_train_spleen, kidney_train, kidney_test, kidney_train_pca, kidney_test_pca, kidney_train_labels, kidney_test_labels, corpus_train_kidney)
 
         #self.bert_embed(brain_test, corpus_brain, brain_y)
         #self.bert_embed(spleen_x, corpus_spleen, spleen_y)
@@ -44,16 +47,10 @@ class data_pre():
     def load_data(self):
         '''
         Data Pre-Processing
-
-        Loads from CSV downloaded from original dance package, and applies LogNormalize 
-        (ScDeepSort choice of normalization)
-
         '''
 
-        '''
-        This Block processes the Train set
-        brain_train, corpus_btrain, s_train, corpus_strain, k_train, corpus_ktrain, btrain_y, strain_y, ktrain_y
-        '''
+        pca = PCA(n_components=self.dimensions)
+
         brain_train = pd.concat([pd.read_csv(self.path+'/train/mouse/mouse_Brain753_data.csv', header=0, index_col=0),
                              pd.read_csv(self.path+'/train/mouse/mouse_Brain3285_data.csv', header=0, index_col=0)],axis=1, ignore_index=False)
         brain_train_y = pd.concat([pd.read_csv(self.path+'/train/mouse/mouse_Brain753_celltype.csv')['Cell_type'],
@@ -72,7 +69,7 @@ class data_pre():
 
         combined_brain = combined_brain.apply(lambda x: x/x.sum(), axis=0)
         combined_brain = combined_brain.apply(lambda x: x*1e4, axis=0)
-        combined_brain = combined_brain.apply(lambda x: np.log1p(x), axis=0).fillna(0)
+        combined_brain = combined_brain.apply(lambda x: np.log2(1+x), axis=0).fillna(0)
 
         row_sums = combined_brain.sum(axis=1)
         low_percentile = np.percentile(row_sums, 1)
@@ -84,6 +81,9 @@ class data_pre():
         combined_brain_filtered = combined_brain[(row_stds > low_std_percentile) & (row_stds < high_std_percentile)]
      
         brain_train, brain_test, brain_train_labels, brain_test_labels = train_test_split(combined_brain_filtered.T, combined_brain_labels, test_size=0.2, random_state=self.seed, stratify=combined_brain_labels)
+
+        brain_train_pca = pca.fit_transform(brain_train)
+        brain_test_pca = pca.fit_transform(brain_test)
 
         brain_train=brain_train.T
         brain_test = brain_test.T
@@ -114,7 +114,7 @@ class data_pre():
 
         combined_spleen = combined_spleen.apply(lambda x: x/x.sum(), axis=0)
         combined_spleen = combined_spleen.apply(lambda x: x*1e4, axis=0)
-        combined_spleen = combined_spleen.apply(lambda x: np.log1p(x), axis=0).fillna(0)
+        combined_spleen = combined_spleen.apply(lambda x: np.log2(1+x), axis=0).fillna(0)
 
         row_sums = combined_spleen.sum(axis=1)
         low_percentile = np.percentile(row_sums, 1)
@@ -126,6 +126,10 @@ class data_pre():
         combined_spleen_filtered = combined_spleen[(row_stds > low_std_percentile) & (row_stds < high_std_percentile)]
 
         spleen_train, spleen_test, spleen_train_labels, spleen_test_labels = train_test_split(combined_spleen_filtered.T, combined_spleen_labels, test_size=0.2, random_state=self.seed, stratify=combined_spleen_labels)
+
+        spleen_train_pca = pca.fit_transform(spleen_train)
+        spleen_test_pca = pca.fit_transform(spleen_test)
+
         spleen_train = spleen_train.T
         spleen_test = spleen_test.T
 
@@ -154,7 +158,7 @@ class data_pre():
 
         combined_kidney = combined_kidney.apply(lambda x: x/x.sum(), axis=0)
         combined_kidney = combined_kidney.apply(lambda x: x*1e4, axis=0)
-        combined_kidney = combined_kidney.apply(lambda x: np.log1p(x), axis=0).fillna(0)
+        combined_kidney = combined_kidney.apply(lambda x: np.log2(1+x), axis=0).fillna(0)
 
         row_sums = combined_kidney.sum(axis=1)
         low_percentile = np.percentile(row_sums, 1)
@@ -166,6 +170,10 @@ class data_pre():
         combined_kidney_filtered = combined_kidney[(row_stds > low_std_percentile) & (row_stds < high_std_percentile)]
         
         kidney_train, kidney_test, kidney_train_labels, kidney_test_labels = train_test_split(combined_kidney_filtered.T, combined_kidney_labels, test_size=0.2, random_state=self.seed, stratify=combined_kidney_labels)
+
+        kidney_train_pca = pca.fit_transform(kidney_train)
+        kidney_test_pca = pca.fit_transform(kidney_test)
+
         kidney_train = kidney_train.T
         kidney_test = kidney_test.T
 
@@ -179,9 +187,9 @@ class data_pre():
             corpus_train_kidney.append(sorted.index.tolist())
         
         print('loaded')
-        return brain_train, brain_test, brain_train_labels, brain_test_labels, corpus_train_brain, spleen_train, spleen_test, spleen_train_labels, spleen_test_labels, corpus_train_spleen, kidney_train, kidney_test, kidney_train_labels, kidney_test_labels, corpus_train_kidney
+        return brain_train, brain_test, brain_train_pca, brain_test_pca, brain_train_labels, brain_test_labels, corpus_train_brain, spleen_train, spleen_test, spleen_train_pca, spleen_test_pca, spleen_train_labels, spleen_test_labels, corpus_train_spleen, kidney_train, kidney_test, kidney_train_pca, kidney_test_pca, kidney_train_labels, kidney_test_labels, corpus_train_kidney
 
-    def get_w2v(self, brain_train, brain_test, brain_train_labels, brain_test_labels, corpus_train_brain, spleen_train, spleen_test, spleen_train_labels, spleen_test_labels, corpus_train_spleen, kidney_train, kidney_test, kidney_train_labels, kidney_test_labels, corpus_train_kidney):
+    def get_w2v(self,  brain_train, brain_test, brain_train_pca, brain_test_pca, brain_train_labels, brain_test_labels, corpus_train_brain, spleen_train, spleen_test, spleen_train_pca, spleen_test_pca, spleen_train_labels, spleen_test_labels, corpus_train_spleen, kidney_train, kidney_test, kidney_train_pca, kidney_test_pca, kidney_train_labels, kidney_test_labels, corpus_train_kidney):
 
         b_w2v = self.w2v_embed(corpus_train_brain).wv
         b_matrix = np.zeros((len(brain_train), b_w2v.vector_size))
@@ -192,16 +200,13 @@ class data_pre():
             except KeyError:
                 b_matrix[i] = np.zeros(b_w2v.vector_size)
         #print(b_matrix.shape)
-        b_cells = np.array([np.multiply(brain_train.T.iloc[i, :], b_matrix.T[j, :]) 
-                            for i in range(brain_train.T.shape[0]) 
-                            for j in range(b_matrix.T.shape[0])]).mean(axis=1)
-        
+        b_cells = brain_train.T.values @ b_matrix
+        b_cells = np.multiply(b_cells, brain_train_pca)
         b_cells = pd.DataFrame(b_cells)
         b_cells.to_csv(self.path+'/brain_train.csv', index=False, header=False)
 
-        b_te_cells = np.array([np.multiply(brain_test.T.iloc[i, :], b_matrix.T[j, :])
-                            for i in range(brain_test.T.shape[0]) 
-                            for j in range(b_matrix.T.shape[0])]).mean(axis=1)
+        b_te_cells = brain_test.T.values @ b_matrix
+        b_te_cells = np.multiply(b_te_cells, brain_test_pca)
         b_te_cells = pd.DataFrame(b_te_cells)
         b_te_cells.to_csv(self.path+'/brain_test.csv', index=False, header=False)
 
@@ -218,15 +223,13 @@ class data_pre():
             except KeyError:
                 s_matrix[i] = np.zeros(s_w2v.vector_size)
 
-        s_cells = np.array([np.multiply(spleen_train.T.iloc[i, :], s_matrix.T[j, :])
-                            for i in range(spleen_train.T.shape[0]) 
-                            for j in range(s_matrix.T.shape[0])]).mean(axis=1)
+        s_cells = spleen_train.T.values @ s_matrix
+        s_cells = np.multiply(s_cells, spleen_train_pca)
         s_cells = pd.DataFrame(s_cells)
         s_cells.to_csv(self.path+'/spleen_train.csv', index=False, header=False)
 
-        s_te_cells = np.array([np.multiply(spleen_test.T.iloc[i, :], s_matrix.T[j, :])
-                            for i in range(spleen_test.T.shape[0]) 
-                            for j in range(s_matrix.T.shape[0])]).mean(axis=1)
+        s_te_cells = spleen_test.T.values @ s_matrix
+        s_te_cells = np.multiply(s_te_cells, spleen_test_pca)
         s_te_cells = pd.DataFrame(s_te_cells)
         s_te_cells.to_csv(self.path+'/spleen_test.csv', index=False, header=False)
 
@@ -243,15 +246,13 @@ class data_pre():
             except KeyError:
                 k_matrix[i] = np.zeros(k_w2v.vector_size)
 
-        k_cells = np.array([np.multiply(kidney_train.T.iloc[i, :], k_matrix.T[j, :])
-                            for i in range(kidney_train.T.shape[0]) 
-                            for j in range(k_matrix.T.shape[0])]).mean(axis=1)
+        k_cells = kidney_train.T.values @ k_matrix
+        k_cells = np.multiply(k_cells, kidney_train_pca)
         k_cells = pd.DataFrame(k_cells)
         k_cells.to_csv(self.path+'/kidney_train.csv', index=False, header=False)
 
-        k_te_cells = np.array([np.multiply(kidney_test.T.iloc[i, :], k_matrix.T[j, :])
-                            for i in range(kidney_test.T.shape[0]) 
-                            for j in range(k_matrix.T.shape[0])]).mean(axis=1)
+        k_te_cells = kidney_test.T.values @ k_matrix
+        k_te_cells = np.multiply(k_te_cells, kidney_test_pca)
         k_te_cells = pd.DataFrame(k_te_cells)
         k_te_cells.to_csv(self.path+'/kidney_test.csv', index=False, header=False)
 
@@ -283,7 +284,7 @@ class data_pre():
         '''
         Word2Vec Embeddings
         '''
-        w2v_embed = Word2Vec(corpus, min_count=1, vector_size=500)
+        w2v_embed = Word2Vec(corpus, min_count=1, vector_size=self.dimensions)
         return w2v_embed
     
     @torch.no_grad()
@@ -303,4 +304,4 @@ class data_pre():
         print(outputs)
         return outputs
 
-data = data_pre()
+#data = data_pre()
