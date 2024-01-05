@@ -11,6 +11,7 @@ data_dir_ = parent_parent+'/dance_data'
 import torch
 import torch.nn.functional as F
 import numpy as np
+import pandas as pd
 
 import dgl
 import copy
@@ -33,6 +34,7 @@ from dance.transforms.graph import PCACellFeatureGraph, CellFeatureGraph
 from dance.typing import LogLevel, Optional
 
 import matplotlib.pyplot as plt
+from WordSage import WordSAGE
 
 train_losses = []
 train_accuracies = []
@@ -46,10 +48,18 @@ num_classes = 21
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 set_seed(42)
-
+'''
+trl = pd.read_csv(data_dir_+'/train/mouse/mouse_Brain999_celltype.csv', header=0)
+tel = pd.read_csv(data_dir_+'/test/mouse/mouse_Brain9999_celltype.csv', header=0)
+trl['Cell'] = "C_" + trl.index.astype(str)
+tel['Cell'] = "C_" + tel.index.astype(str)
+trl.to_csv(data_dir_+'/train/mouse/mouse_Brain999_celltype.csv', index=True)
+tel.to_csv(data_dir_+'/test/mouse/mouse_Brain9999_celltype.csv', index=True)
+'''
 #ScDeepSort
 
 model = ScDeepSort(dim_in=in_channels, dim_hid=hidden_channels, num_layers=1, species='mouse', tissue='Kidney', device=torch.device('cuda'))
+
 preprocessing_pipeline = Compose(
     AnnDataTransform(sc.pp.normalize_total, target_sum=1e4),
     AnnDataTransform(sc.pp.log1p),
@@ -62,9 +72,10 @@ def train_pipeline(n_components: int = 400, log_level: LogLevel = "INFO"):
         log_level=log_level,
     )
 dataset = ScDeepSortDataset(species="mouse", tissue="Brain",
-                            train_dataset=["753", "3285"], test_dataset=["2695"], data_dir = data_dir_)
+                            train_dataset=["999"], test_dataset=["9999"], data_dir = data_dir_)
 data = dataset.load_data()
-preprocessing_pipeline(data)
+#preprocessing_pipeline(data)
+#data = [train_inputs, test_inputs, 0, 0, 0]
 train_pipeline()(data)
 
 y_train = data.get_train_data(return_type="torch")[1]
@@ -73,7 +84,7 @@ y_train = torch.cat([y_train, y_test], dim=0)
 y_train = torch.argmax(y_train, 1)
 y_test = torch.argmax(y_test, 1)
 #print(y_train)
-print(y_test)
+#print(y_test)
 #print(data.data.uns['CellFeatureGraph'])
 model.fit(graph=data.data.uns["CellFeatureGraph"], labels=y_train)
 train_losses = model.train_losses
@@ -101,7 +112,7 @@ plt.show()
 with torch.no_grad():
     result = model.predict_proba(graph=data.data.uns["CellFeatureGraph"])
 
-result = result[4682:]
+result = result[-1347:]
 result = torch.tensor(result)
 predicted = torch.argmax(result, 1)
 #torch.set_printoptions(profile="full")
