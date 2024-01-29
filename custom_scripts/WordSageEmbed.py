@@ -57,7 +57,7 @@ class WordSAGE(torch.nn.Module):
     def forward(self, x, edge_index):
         h = self.conv1(x, edge_index)
         h = F.relu(h)
-        h = self.self_attention(h,h,h)
+        h, weights = self.self_attention(h,h,h)
         h = F.relu(h)
         h = F.dropout(h, p=0.5, training=self.training)
         h = self.conv2(x, h)
@@ -179,20 +179,26 @@ class WordSAGE(torch.nn.Module):
 
         # Combine inputs and targets
         combined = pd.concat([inputs, targets], axis=1)
-
+        print(combined.shape)
         # Shuffle the combined DataFrame
         combined_shuffled = combined.sample(frac=1).reset_index(drop=True)
 
         # Convert each row of targets to a single list
-        targets_shuffled = combined_shuffled.apply(lambda row: row[len(inputs):].tolist(), axis=1)
+        targets_shuffled = combined_shuffled.iloc[:, 500:]
+        ls = []
+        for row in targets_shuffled.iloc:
+            new = [row]
+            ls.append(new)
+        
+        targets_shuffled = ls
 
         # Separate inputs and targets
-        inputs_shuffled = combined_shuffled.iloc[:, :-len(targets.columns)]
-
+        inputs_shuffled = combined_shuffled.iloc[:, :500]
+        #print(targets_shuffled)
         return inputs_shuffled, targets_shuffled
 
 
-device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+device = torch.device('cpu' if torch.cuda.is_available() else 'cpu')
 seed = 42
 set_seed(42)
 in_channels = 500
@@ -205,7 +211,9 @@ train_graph, train_targets, test_graph, test_targets, train_nodes, test_nodes = 
 train_targets = torch.tensor(train_targets).to(device)
 test_targets = torch.tensor(test_targets).to(device)
 
-criterion = torch.nn.CrossEntropyLoss()
+#print(train_targets.shape)
+
+criterion = torch.nn.BCEWithLogitsLoss()#torch.nn.CrossEntropyLoss()
 optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
 
 train_input_nodes = [i for i in range(train_graph.number_of_nodes()) if i < train_nodes]
@@ -220,7 +228,7 @@ for epoch in range(300):
     model.train()
     optimizer.zero_grad()
     feature, out = model(train_graph, train_graph.ndata['features'])
-    loss = criterion(out[(range(train_nodes))], train_targets)
+    loss = criterion(out[(range(train_nodes))], train_targets.squeeze(1))
     loss.backward()
     optimizer.step()
 
@@ -229,7 +237,7 @@ feature.to_csv(data_dir_+"tuned_features.csv",index=False, header=False)
 
 model.eval()
 with torch.no_grad():
-    prob = model(test_graph, test_graph.ndata['features'])
+    feat, prob = model(test_graph, test_graph.ndata['features'])
     test_loss = criterion(prob[(range(test_nodes))], test_targets)
 
     test_out = F.softmax(prob[(range(test_nodes))])

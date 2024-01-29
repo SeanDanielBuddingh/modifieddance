@@ -35,7 +35,7 @@ from dance.modules.single_modality.cell_type_annotation.actinn import ACTINN
 #Celltypist
 from dance.modules.single_modality.cell_type_annotation.celltypist import Celltypist
 
-from WordSage import WordSAGE
+from WordSageimport import WordSAGE
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 seed = 42

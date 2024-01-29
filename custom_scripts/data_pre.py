@@ -20,7 +20,7 @@ from transformers import BertTokenizer, BertModel
 class data_pre():
     def __init__(self):
         self.seed = 42
-        self.dimensions = 500
+        self.dimensions = 2500
 
         current_script_path = __file__
         current_dir = os.path.dirname(current_script_path)
@@ -33,9 +33,11 @@ class data_pre():
         
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
-        #brain_train, brain_test, brain_train_pca, brain_test_pca, brain_train_labels, brain_test_labels, corpus_train_brain, spleen_train, spleen_test, spleen_train_pca, spleen_test_pca, spleen_train_labels, spleen_test_labels, corpus_train_spleen, kidney_train, kidney_test, kidney_train_pca, kidney_test_pca, kidney_train_labels, kidney_test_labels, corpus_train_kidney = self.load_data()
-        
-        #self.get_w2v(brain_train, brain_test, brain_train_pca, brain_test_pca, brain_train_labels, brain_test_labels, corpus_train_brain, spleen_train, spleen_test, spleen_train_pca, spleen_test_pca, spleen_train_labels, spleen_test_labels, corpus_train_spleen, kidney_train, kidney_test, kidney_train_pca, kidney_test_pca, kidney_train_labels, kidney_test_labels, corpus_train_kidney)
+        #brain_train, brain_test, brain_train_labels, brain_test_labels, corpus_train_brain, spleen_train, spleen_test, spleen_train_labels, spleen_test_labels, corpus_train_spleen, kidney_train, kidney_test, kidney_train_labels, kidney_test_labels, corpus_train_kidney = self.load_data()
+        pancreas_train, pancreas_test, pancreas_train_labels, pancreas_test_labels, corpus_train_pancreas, spleen_train, spleen_test, spleen_train_labels, spleen_test_labels, corpus_train_spleen, bonemarrow_train, bonemarrow_test, bonemarrow_train_labels, bonemarrow_test_labels, corpus_train_bonemarrow = self.load_human_data()
+
+        #self.get_w2v(brain_train, brain_test, brain_train_labels, brain_test_labels, corpus_train_brain, spleen_train, spleen_test, spleen_train_labels, spleen_test_labels, corpus_train_spleen, kidney_train, kidney_test, kidney_train_labels, kidney_test_labels, corpus_train_kidney)
+        self.get_w2v_human(pancreas_train, pancreas_test, pancreas_train_labels, pancreas_test_labels, corpus_train_pancreas, spleen_train, spleen_test, spleen_train_labels, spleen_test_labels, corpus_train_spleen, bonemarrow_train, bonemarrow_test, bonemarrow_train_labels, bonemarrow_test_labels, corpus_train_bonemarrow)
 
         #self.bert_embed(brain_test, corpus_brain, brain_y)
         #self.bert_embed(spleen_x, corpus_spleen, spleen_y)
@@ -43,14 +45,147 @@ class data_pre():
         #self.bert_embed(brain_train, corpus_btrain, btrain_y)
         #self.bert_embed(s_train, corpus_strain, strain_y)
         #self.bert_embed(k_train, corpus_ktrain, ktrain_y)
+    def load_human_data(self):
+        '''
+        Human Pancreas
+        '''
+        pancreas_train = pd.read_csv(self.path+'/train/human/human_cell_atlas/human_Pancreas9727_data.csv', header=0, index_col=0)
+        pancreas_train_y = pd.read_csv(self.path+'/train/human/human_cell_atlas/human_Pancreas9727_celltype.csv')['Cell_type']
+            
+        pancreas_test = pd.concat([pd.read_csv(self.path+'/test/human/human_cell_atlas/human_Pancreas2227_data.csv', header=0, index_col=0),
+                             pd.read_csv(self.path+'/test/human/human_cell_atlas/human_Pancreas1841_data.csv', header=0, index_col=0)],axis=1, ignore_index=False)
+        pancreas_test_y = pd.concat([pd.read_csv(self.path+'/test/human/human_cell_atlas/human_Pancreas2227_celltype.csv')['Cell_type'],
+                              pd.read_csv(self.path+'/test/human/human_cell_atlas/human_Pancreas1841_celltype.csv')['Cell_type']], axis=0, ignore_index=True).reset_index(drop=True)
         
+        combined_pancreas_labels = pd.concat([pancreas_train_y, pancreas_test_y], axis=0, ignore_index=True).reset_index(drop=True)
+        train_genes = set(pancreas_train.index)
+        test_genes = set(pancreas_test.index)
+        common_genes = train_genes.intersection(test_genes)
+
+        combined_pancreas = pd.concat([pancreas_train, pancreas_test], axis=1, ignore_index=False).fillna(0).loc[list(common_genes)]
+        combined_pancreas.columns = range(combined_pancreas.shape[1])
+
+        combined_pancreas = combined_pancreas.apply(lambda x: x/x.sum(), axis=0)
+        combined_pancreas = combined_pancreas.apply(lambda x: x*1e4, axis=0)
+        combined_pancreas = combined_pancreas.apply(lambda x: np.log2(1+x), axis=0).fillna(0)
+
+        row_sums = combined_pancreas.sum(axis=1)
+        low_percentile = np.percentile(row_sums, 1)
+        high_percentile = np.percentile(row_sums, 99)
+        combined_pancreas = combined_pancreas[(row_sums > low_percentile) & (row_sums < high_percentile)]
+        row_stds = combined_pancreas.std(axis=1)
+        low_std_percentile = np.percentile(row_stds, 1)
+        high_std_percentile = np.percentile(row_stds, 99)
+        combined_pancreas_filtered = combined_pancreas[(row_stds > low_std_percentile) & (row_stds < high_std_percentile)]
+     
+        pancreas_train, pancreas_test, pancreas_train_labels, pancreas_test_labels = train_test_split(combined_pancreas_filtered.T, combined_pancreas_labels, test_size=0.2, random_state=self.seed, stratify=combined_pancreas_labels)
+
+        pancreas_train=pancreas_train.T
+        pancreas_test = pancreas_test.T
+
+        pancreas_train.to_csv(self.path+'/normalized_pancreas_train.csv', index=True, header=True)
+        pancreas_test.to_csv(self.path+'/normalized_pancreas_test.csv', index=True, header=True)      
+
+        corpus_train_pancreas = []
+        for c_name in pancreas_train.columns:
+            cell = pancreas_train[c_name]
+            sorted = cell[cell!=0].sort_values(ascending=False)
+            corpus_train_pancreas.append(sorted.index.tolist())
+        '''
+        Human Spleen
+        '''
+        spleen_train = pd.read_csv(self.path+'/train/human/human_cell_atlas/human_Spleen15806_data.csv', header=0, index_col=0)
+        spleen_train_y = pd.read_csv(self.path+'/train/human/human_cell_atlas/human_Pancreas15806_celltype.csv')['Cell_type']
+            
+        spleen_test = pd.read_csv(self.path+'/test/human/human_cell_atlas/human_Spleen9887_data.csv', header=0, index_col=0)
+        spleen_test_y = pd.read_csv(self.path+'/test/human/human_cell_atlas/human_Pancreas9887_celltype.csv')['Cell_type']
+        
+        combined_spleen_labels = pd.concat([spleen_train_y, spleen_test_y], axis=0, ignore_index=True).reset_index(drop=True)
+        train_genes = set(spleen_train.index)
+        test_genes = set(spleen_test.index)
+        common_genes = train_genes.intersection(test_genes)
+
+        combined_spleen = pd.concat([spleen_train, spleen_test], axis=1, ignore_index=False).fillna(0).loc[list(common_genes)]
+        combined_spleen.columns = range(combined_spleen.shape[1])
+
+        combined_spleen = combined_spleen.apply(lambda x: x/x.sum(), axis=0)
+        combined_spleen = combined_spleen.apply(lambda x: x*1e4, axis=0)
+        combined_spleen = combined_spleen.apply(lambda x: np.log2(1+x), axis=0).fillna(0)
+
+        row_sums = combined_spleen.sum(axis=1)
+        low_percentile = np.percentile(row_sums, 1)
+        high_percentile = np.percentile(row_sums, 99)
+        combined_spleen = combined_spleen[(row_sums > low_percentile) & (row_sums < high_percentile)]
+        row_stds = combined_spleen.std(axis=1)
+        low_std_percentile = np.percentile(row_stds, 1)
+        high_std_percentile = np.percentile(row_stds, 99)
+        combined_spleen_filtered = combined_spleen[(row_stds > low_std_percentile) & (row_stds < high_std_percentile)]
+     
+        spleen_train, spleen_test, spleen_train_labels, spleen_test_labels = train_test_split(combined_spleen_filtered.T, combined_spleen_labels, test_size=0.2, random_state=self.seed, stratify=combined_spleen_labels)
+
+        spleen_train=spleen_train.T
+        spleen_test = spleen_test.T
+
+        spleen_train.to_csv(self.path+'/normalized_spleen_train.csv', index=True, header=True)
+        spleen_test.to_csv(self.path+'/normalized_spleen_test.csv', index=True, header=True)      
+
+        corpus_train_spleen = []
+        for c_name in spleen_train.columns:
+            cell = spleen_train[c_name]
+            sorted = cell[cell!=0].sort_values(ascending=False)
+            corpus_train_spleen.append(sorted.index.tolist())
+        '''
+        Human Bone Marrow
+        '''
+        bonemarrow_train = pd.read_csv(self.path+'/train/human/human_cell_atlas/human_Bone_marrow2261_data.csv', header=0, index_col=0)
+        bonemarrow_train_y = pd.read_csv(self.path+'/train/human/human_cell_atlas/human_Bone_marrow2261_celltype.csv')['Cell_type']
+            
+        bonemarrow_test = pd.read_csv(self.path+'/train/human/human_cell_atlas/human_Bone_marrow6443_data.csv', header=0, index_col=0)
+        bonemarrow_test_y = pd.read_csv(self.path+'/train/human/human_cell_atlas/human_Bone_marrow6443_celltype.csv')['Cell_type']
+        
+        combined_bonemarrow_labels = pd.concat([bonemarrow_train_y, bonemarrow_test_y], axis=0, ignore_index=True).reset_index(drop=True)
+        train_genes = set(bonemarrow_train.index)
+        test_genes = set(bonemarrow_test.index)
+        common_genes = train_genes.intersection(test_genes)
+
+        combined_bonemarrow = pd.concat([bonemarrow_train, bonemarrow_test], axis=1, ignore_index=False).fillna(0).loc[list(common_genes)]
+        combined_bonemarrow.columns = range(combined_bonemarrow.shape[1])
+
+        combined_bonemarrow = combined_bonemarrow.apply(lambda x: x/x.sum(), axis=0)
+        combined_bonemarrow = combined_bonemarrow.apply(lambda x: x*1e4, axis=0)
+        combined_bonemarrow = combined_bonemarrow.apply(lambda x: np.log2(1+x), axis=0).fillna(0)
+
+        row_sums = combined_bonemarrow.sum(axis=1)
+        low_percentile = np.percentile(row_sums, 1)
+        high_percentile = np.percentile(row_sums, 99)
+        combined_bonemarrow = combined_bonemarrow[(row_sums > low_percentile) & (row_sums < high_percentile)]
+        row_stds = combined_bonemarrow.std(axis=1)
+        low_std_percentile = np.percentile(row_stds, 1)
+        high_std_percentile = np.percentile(row_stds, 99)
+        combined_bonemarrow_filtered = combined_bonemarrow[(row_stds > low_std_percentile) & (row_stds < high_std_percentile)]
+     
+        bonemarrow_train, bonemarrow_test, bonemarrow_train_labels, bonemarrow_test_labels = train_test_split(combined_bonemarrow_filtered.T, combined_bonemarrow_labels, test_size=0.2, random_state=self.seed, stratify=combined_bonemarrow_labels)
+
+        bonemarrow_train=bonemarrow_train.T
+        bonemarrow_test = bonemarrow_test.T
+
+        bonemarrow_train.to_csv(self.path+'/normalized_bonemarrow_train.csv', index=True, header=True)
+        bonemarrow_test.to_csv(self.path+'/normalized_bonemarrow_test.csv', index=True, header=True)      
+
+        corpus_train_bonemarrow = []
+        for c_name in bonemarrow_train.columns:
+            cell = bonemarrow_train[c_name]
+            sorted = cell[cell!=0].sort_values(ascending=False)
+            corpus_train_bonemarrow.append(sorted.index.tolist())
+
+        print('loaded')
+        
+        return pancreas_train, pancreas_test, pancreas_train_labels, pancreas_test_labels, corpus_train_pancreas, spleen_train, spleen_test, spleen_train_labels, spleen_test_labels, corpus_train_spleen, bonemarrow_train, bonemarrow_test, bonemarrow_train_labels, bonemarrow_test_labels, corpus_train_bonemarrow
+
     def load_data(self):
         '''
-        Data Pre-Processing
+        Mouse Pre-Processing
         '''
-
-        pca = PCA(n_components=self.dimensions)
-
         brain_train = pd.concat([pd.read_csv(self.path+'/train/mouse/mouse_Brain753_data.csv', header=0, index_col=0),
                              pd.read_csv(self.path+'/train/mouse/mouse_Brain3285_data.csv', header=0, index_col=0)],axis=1, ignore_index=False)
         brain_train_y = pd.concat([pd.read_csv(self.path+'/train/mouse/mouse_Brain753_celltype.csv')['Cell_type'],
@@ -82,40 +217,19 @@ class data_pre():
      
         brain_train, brain_test, brain_train_labels, brain_test_labels = train_test_split(combined_brain_filtered.T, combined_brain_labels, test_size=0.2, random_state=self.seed, stratify=combined_brain_labels)
 
-        #brain_train_pca = pca.fit_transform(brain_train)
-        #brain_test_pca = pca.fit_transform(brain_test)
-
         brain_train=brain_train.T
         brain_test = brain_test.T
 
         brain_train.to_csv(self.path+'/normalized_brain_train.csv', index=True, header=True)
         brain_test.to_csv(self.path+'/normalized_brain_test.csv', index=True, header=True)      
- 
-        train_list = []
-        test_list = []
+
         corpus_train_brain = []
         for c_name in brain_train.columns:
             cell = brain_train[c_name]
             sorted = cell[cell!=0].sort_values(ascending=False)
-            train_list.append(sorted.reset_index(drop=True))
             corpus_train_brain.append(sorted.index.tolist())
 
-        brain_train_pca = pd.concat(train_list, axis=1)
         
-        brain_train_pca = brain_train.iloc[:self.dimensions, :].fillna(0) + 1
-        brain_train_pca = brain_train_pca.T
-
-        print(brain_train_pca)
-
-        for c_name in brain_test.columns:
-            cell = brain_test[c_name]
-            sorted = cell[cell!=0].sort_values(ascending=False)
-            test_list.append(sorted.reset_index(drop=True))
-
-        brain_test_pca = pd.concat(test_list, axis=1)
-        brain_test_pca = brain_test.iloc[:self.dimensions, :].fillna(0) + 1
-        brain_test_pca = brain_test_pca.T
-
         spleen_train = pd.read_csv(self.path+'/train/mouse/mouse_Spleen1970_data.csv', header=0, index_col=0)
         spleen_train_y = pd.read_csv(self.path+'/train/mouse/mouse_Spleen1970_celltype.csv')['Cell_type'].reset_index(drop=True)
 
@@ -145,9 +259,6 @@ class data_pre():
         combined_spleen_filtered = combined_spleen[(row_stds > low_std_percentile) & (row_stds < high_std_percentile)]
 
         spleen_train, spleen_test, spleen_train_labels, spleen_test_labels = train_test_split(combined_spleen_filtered.T, combined_spleen_labels, test_size=0.2, random_state=self.seed, stratify=combined_spleen_labels)
-
-        spleen_train_pca = pca.fit_transform(spleen_train)
-        spleen_test_pca = pca.fit_transform(spleen_test)
 
         spleen_train = spleen_train.T
         spleen_test = spleen_test.T
@@ -190,9 +301,6 @@ class data_pre():
         
         kidney_train, kidney_test, kidney_train_labels, kidney_test_labels = train_test_split(combined_kidney_filtered.T, combined_kidney_labels, test_size=0.2, random_state=self.seed, stratify=combined_kidney_labels)
 
-        kidney_train_pca = pca.fit_transform(kidney_train)
-        kidney_test_pca = pca.fit_transform(kidney_test)
-
         kidney_train = kidney_train.T
         kidney_test = kidney_test.T
 
@@ -206,10 +314,11 @@ class data_pre():
             corpus_train_kidney.append(sorted.index.tolist())
         
         print('loaded')
-        return brain_train, brain_test, brain_train_pca, brain_test_pca, brain_train_labels, brain_test_labels, corpus_train_brain, spleen_train, spleen_test, spleen_train_pca, spleen_test_pca, spleen_train_labels, spleen_test_labels, corpus_train_spleen, kidney_train, kidney_test, kidney_train_pca, kidney_test_pca, kidney_train_labels, kidney_test_labels, corpus_train_kidney
+        
+        return brain_train, brain_test, brain_train_labels, brain_test_labels, corpus_train_brain, spleen_train, spleen_test, spleen_train_labels, spleen_test_labels, corpus_train_spleen, kidney_train, kidney_test, kidney_train_labels, kidney_test_labels, corpus_train_kidney
 
-    def get_w2v(self,  brain_train, brain_test, brain_train_pca, brain_test_pca, brain_train_labels, brain_test_labels, corpus_train_brain, spleen_train, spleen_test, spleen_train_pca, spleen_test_pca, spleen_train_labels, spleen_test_labels, corpus_train_spleen, kidney_train, kidney_test, kidney_train_pca, kidney_test_pca, kidney_train_labels, kidney_test_labels, corpus_train_kidney):
-
+    def get_w2v(self,  brain_train, brain_test, brain_train_labels, brain_test_labels, corpus_train_brain, spleen_train, spleen_test, spleen_train_labels, spleen_test_labels, corpus_train_spleen, kidney_train, kidney_test, kidney_train_labels, kidney_test_labels, corpus_train_kidney):
+        
         b_w2v = self.w2v_embed(corpus_train_brain).wv
         b_matrix = np.zeros((len(brain_train), b_w2v.vector_size))
 
@@ -220,19 +329,17 @@ class data_pre():
                 b_matrix[i] = np.zeros(b_w2v.vector_size)
         #print(b_matrix.shape)
         b_cells = brain_train.T.values @ b_matrix
-        b_cells = np.multiply(b_cells, brain_train_pca)
         b_cells = pd.DataFrame(b_cells)
         b_cells.to_csv(self.path+'/brain_train.csv', index=False, header=False)
 
         b_te_cells = brain_test.T.values @ b_matrix
-        b_te_cells = np.multiply(b_te_cells, brain_test_pca)
         b_te_cells = pd.DataFrame(b_te_cells)
         b_te_cells.to_csv(self.path+'/brain_test.csv', index=False, header=False)
 
         brain_genes = pd.DataFrame(b_matrix)
         brain_genes.index = brain_train.index 
         brain_genes.to_csv(self.path+'/brain_w2v_genes.csv', index=True, header=False)
-
+        
         s_w2v = self.w2v_embed(corpus_train_spleen).wv
         s_matrix = np.zeros((len(spleen_train), s_w2v.vector_size))
 
@@ -243,12 +350,10 @@ class data_pre():
                 s_matrix[i] = np.zeros(s_w2v.vector_size)
 
         s_cells = spleen_train.T.values @ s_matrix
-        s_cells = np.multiply(s_cells, spleen_train_pca)
         s_cells = pd.DataFrame(s_cells)
         s_cells.to_csv(self.path+'/spleen_train.csv', index=False, header=False)
 
         s_te_cells = spleen_test.T.values @ s_matrix
-        s_te_cells = np.multiply(s_te_cells, spleen_test_pca)
         s_te_cells = pd.DataFrame(s_te_cells)
         s_te_cells.to_csv(self.path+'/spleen_test.csv', index=False, header=False)
 
@@ -266,26 +371,98 @@ class data_pre():
                 k_matrix[i] = np.zeros(k_w2v.vector_size)
 
         k_cells = kidney_train.T.values @ k_matrix
-        k_cells = np.multiply(k_cells, kidney_train_pca)
         k_cells = pd.DataFrame(k_cells)
         k_cells.to_csv(self.path+'/kidney_train.csv', index=False, header=False)
 
         k_te_cells = kidney_test.T.values @ k_matrix
-        k_te_cells = np.multiply(k_te_cells, kidney_test_pca)
         k_te_cells = pd.DataFrame(k_te_cells)
         k_te_cells.to_csv(self.path+'/kidney_test.csv', index=False, header=False)
 
         kidney_genes = pd.DataFrame(k_matrix)
         kidney_genes.index = kidney_train.index 
         kidney_genes.to_csv(self.path+'/kidney_w2v_genes.csv', index=True, header=False)
-
+        
         brain_train_labels.to_csv(self.path+'/brain_train_labels.csv', index=False)
         brain_test_labels.to_csv(self.path+'/brain_test_labels.csv', index=False)
         spleen_train_labels.to_csv(self.path+'/spleen_train_labels.csv', index=False)
         spleen_test_labels.to_csv(self.path+'/spleen_test_labels.csv', index=False)
         kidney_train_labels.to_csv(self.path+'/kidney_train_labels.csv', index=False)
         kidney_test_labels.to_csv(self.path+'/kidney_test_labels.csv', index=False)
+        
+        print('printed')
 
+    def get_w2v_human(self,  brain_train, brain_test, brain_train_labels, brain_test_labels, corpus_train_brain, spleen_train, spleen_test, spleen_train_labels, spleen_test_labels, corpus_train_spleen, kidney_train, kidney_test, kidney_train_labels, kidney_test_labels, corpus_train_kidney):
+        
+        b_w2v = self.w2v_embed(corpus_train_brain).wv
+        b_matrix = np.zeros((len(brain_train), b_w2v.vector_size))
+
+        for i, gene in enumerate(brain_train.index):
+            try:
+                b_matrix[i] = b_w2v[gene]
+            except KeyError:
+                b_matrix[i] = np.zeros(b_w2v.vector_size)
+        #print(b_matrix.shape)
+        b_cells = brain_train.T.values @ b_matrix
+        b_cells = pd.DataFrame(b_cells)
+        b_cells.to_csv(self.path+'/pancreas_train.csv', index=False, header=False)
+
+        b_te_cells = brain_test.T.values @ b_matrix
+        b_te_cells = pd.DataFrame(b_te_cells)
+        b_te_cells.to_csv(self.path+'/pancreas_test.csv', index=False, header=False)
+
+        brain_genes = pd.DataFrame(b_matrix)
+        brain_genes.index = brain_train.index 
+        brain_genes.to_csv(self.path+'/pancreas_w2v_genes.csv', index=True, header=False)
+        
+        s_w2v = self.w2v_embed(corpus_train_spleen).wv
+        s_matrix = np.zeros((len(spleen_train), s_w2v.vector_size))
+
+        for i, gene in enumerate(spleen_train.index):
+            try:
+                s_matrix[i] = s_w2v[gene]
+            except KeyError:
+                s_matrix[i] = np.zeros(s_w2v.vector_size)
+
+        s_cells = spleen_train.T.values @ s_matrix
+        s_cells = pd.DataFrame(s_cells)
+        s_cells.to_csv(self.path+'/spleen_human_train.csv', index=False, header=False)
+
+        s_te_cells = spleen_test.T.values @ s_matrix
+        s_te_cells = pd.DataFrame(s_te_cells)
+        s_te_cells.to_csv(self.path+'/spleen_human_test.csv', index=False, header=False)
+
+        spleen_genes = pd.DataFrame(s_matrix)
+        spleen_genes.index = spleen_train.index 
+        spleen_genes.to_csv(self.path+'/spleen_human_w2v_genes.csv', index=True, header=False)
+
+        k_w2v = self.w2v_embed(corpus_train_kidney).wv
+        k_matrix = np.zeros((len(kidney_train), k_w2v.vector_size))
+
+        for i, gene in enumerate(kidney_train.index):
+            try:
+                k_matrix[i] = k_w2v[gene]
+            except KeyError:
+                k_matrix[i] = np.zeros(k_w2v.vector_size)
+
+        k_cells = kidney_train.T.values @ k_matrix
+        k_cells = pd.DataFrame(k_cells)
+        k_cells.to_csv(self.path+'/bone_train.csv', index=False, header=False)
+
+        k_te_cells = kidney_test.T.values @ k_matrix
+        k_te_cells = pd.DataFrame(k_te_cells)
+        k_te_cells.to_csv(self.path+'/bone_test.csv', index=False, header=False)
+
+        kidney_genes = pd.DataFrame(k_matrix)
+        kidney_genes.index = kidney_train.index 
+        kidney_genes.to_csv(self.path+'/bone_w2v_genes.csv', index=True, header=False)
+        
+        brain_train_labels.to_csv(self.path+'/pancreas_train_labels.csv', index=False)
+        brain_test_labels.to_csv(self.path+'/pancreas_test_labels.csv', index=False)
+        spleen_train_labels.to_csv(self.path+'/spleen_human_train_labels.csv', index=False)
+        spleen_test_labels.to_csv(self.path+'/spleen_human_test_labels.csv', index=False)
+        kidney_train_labels.to_csv(self.path+'/bone_train_labels.csv', index=False)
+        kidney_test_labels.to_csv(self.path+'/bone_test_labels.csv', index=False)
+        
         print('printed')
 
     def read_w2v(self):
@@ -303,7 +480,7 @@ class data_pre():
         '''
         Word2Vec Embeddings
         '''
-        w2v_embed = Word2Vec(corpus, min_count=1, vector_size=self.dimensions)
+        w2v_embed = Word2Vec(corpus, min_count=1, vector_size=self.dimensions, window=500)
         return w2v_embed
     
     @torch.no_grad()
@@ -322,5 +499,4 @@ class data_pre():
 
         print(outputs)
         return outputs
-
-#data = data_pre()
+data = data_pre()
