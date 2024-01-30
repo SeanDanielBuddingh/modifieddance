@@ -26,8 +26,8 @@ from sklearn.metrics import accuracy_score
 
 from WordSage import WordSAGE
 
-in_channels = 100
-hidden_channels = 100
+in_channels = 2500
+hidden_channels = 2500
 out_channels = 100
 num_classes = 21
 WordSage = WordSAGE(in_channels, hidden_channels, out_channels, num_classes)

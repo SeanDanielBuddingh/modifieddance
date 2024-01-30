@@ -23,6 +23,8 @@ import gc
 from scipy.sparse import csr_matrix
 import dgl
 import copy
+from sklearn.preprocessing import OneHotEncoder
+from torcheval.metrics import MulticlassAUROC
 
 #ScDeepSort Imports
 from dance.modules.single_modality.cell_type_annotation.scdeepsort import ScDeepSort
@@ -171,8 +173,8 @@ device=torch.device('cuda')
 model = ACTINN(lambd=0.01, device='cuda')
 
 preprocessing_pipeline = model.preprocessing_pipeline(normalize=True, filter_genes=True)
-dataset = ScDeepSortDataset(species="mouse", tissue="Brain",
-                            train_dataset=["753", "3285"], test_dataset=["2695"], data_dir = data_dir_)
+dataset = ScDeepSortDataset(species="mouse", tissue="Kidney",
+                            train_dataset=["4682"], test_dataset=["203"], data_dir = data_dir_)
 data = dataset.load_data()
 preprocessing_pipeline(data)
 x_train, y_train = data.get_train_data(return_type="torch")
@@ -180,6 +182,7 @@ x_test, y_test = data.get_test_data(return_type="torch")
 seed = 42
 y_train = torch.argmax(y_train, dim=1)
 y_test = torch.argmax(y_test, dim=1)
+num_classes = len(torch.unique(torch.cat([y_train, y_test], dim=0)))
 print(torch.unique(y_train))
 print(torch.unique(y_test))
 
@@ -196,19 +199,18 @@ y_test = torch.tensor(y_test[0].values, dtype=torch.long).to(device)
 x_train = torch.tensor(x_train.to_numpy(), dtype=torch.float32).to(device)
 x_test = torch.tensor(x_test.to_numpy(), dtype=torch.float32).to(device)
 
-x_train = x_train.to(device)
-y_train = y_train.to(device)
-x_test = x_test.to(device)
-y_test = y_test.to(device)
-print(y_test.shape)
-print(F.one_hot(y_test, num_classes=16).cpu().shape)
-
 model.fit(x_train, y_train, lr=0.001, num_epochs=300,
           batch_size=1000, print_cost=True)
 pred = model.predict(x_test)
 acc = accuracy_score(y_test.cpu(), pred.cpu())
 
-macro_auc = roc_auc_score(F.one_hot(y_test, num_classes=16).cpu(), F.softmax(model.model(x_test.to(device)).cpu()).detach(), multi_class='ovo', average='macro')
+#torch.set_printoptions(profile="full")
+#print(F.softmax(model.model(x_test).cpu()).detach())
+
+auc = MulticlassAUROC(num_classes=num_classes)
+auc.update(F.softmax(model.model(x_test).cpu()).detach(), y_test.cpu())
+
+#macro_auc = roc_auc_score(F.one_hot(y_test, num_classes=num_classes).cpu().numpy(), F.softmax(model.model(x_test).cpu()).detach().numpy(), multi_class='ovo', average='macro')
 f1 = f1_score(y_test.cpu(), pred.cpu(), average='macro')
 precision = precision_score(y_test.cpu(), pred.cpu(), average='macro')
 recall = recall_score(y_test.cpu(), pred.cpu(), average='macro')
@@ -218,7 +220,7 @@ cm = confusion_matrix(y_test.cpu(), pred.cpu())
 specificity = np.sum(np.diag(cm)) / np.sum(cm)
 
 print(f"ACC: {acc}")
-print(f"Macro AUC: {macro_auc}")
+print(f"Macro AUC: {auc.compute()}")
 print(f"F1: {f1}")
 print(f"Precision: {precision}")
 print(f"Recall: {recall}")

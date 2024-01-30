@@ -66,7 +66,7 @@ model.fit(train_inputs, train_targets, lr=0.001, num_epochs=300,
 pred = model.predict(test_inputs)
 acc = accuracy_score(test_targets.cpu(), pred.cpu())
 print(set(test_targets.cpu().numpy()))
-print(F.softmax(model.model(test_inputs).cpu()).detach().shape)
+print(F.softmax(model.model(test_inputs).cpu()).detach())
 
 macro_auc = roc_auc_score(F.one_hot(test_targets, num_classes=num_classes).cpu(), F.softmax(model.model(test_inputs).cpu()).detach(), multi_class='ovo', average='macro')
 f1 = f1_score(test_targets.cpu(), pred.cpu(), average='macro')

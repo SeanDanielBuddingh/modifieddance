@@ -34,10 +34,10 @@ class data_pre():
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
         #brain_train, brain_test, brain_train_labels, brain_test_labels, corpus_train_brain, spleen_train, spleen_test, spleen_train_labels, spleen_test_labels, corpus_train_spleen, kidney_train, kidney_test, kidney_train_labels, kidney_test_labels, corpus_train_kidney = self.load_data()
-        pancreas_train, pancreas_test, pancreas_train_labels, pancreas_test_labels, corpus_train_pancreas, spleen_train, spleen_test, spleen_train_labels, spleen_test_labels, corpus_train_spleen, bonemarrow_train, bonemarrow_test, bonemarrow_train_labels, bonemarrow_test_labels, corpus_train_bonemarrow = self.load_human_data()
+        #pancreas_train, pancreas_test, pancreas_train_labels, pancreas_test_labels, corpus_train_pancreas, spleen_train, spleen_test, spleen_train_labels, spleen_test_labels, corpus_train_spleen, bonemarrow_train, bonemarrow_test, bonemarrow_train_labels, bonemarrow_test_labels, corpus_train_bonemarrow = self.load_human_data()
 
         #self.get_w2v(brain_train, brain_test, brain_train_labels, brain_test_labels, corpus_train_brain, spleen_train, spleen_test, spleen_train_labels, spleen_test_labels, corpus_train_spleen, kidney_train, kidney_test, kidney_train_labels, kidney_test_labels, corpus_train_kidney)
-        self.get_w2v_human(pancreas_train, pancreas_test, pancreas_train_labels, pancreas_test_labels, corpus_train_pancreas, spleen_train, spleen_test, spleen_train_labels, spleen_test_labels, corpus_train_spleen, bonemarrow_train, bonemarrow_test, bonemarrow_train_labels, bonemarrow_test_labels, corpus_train_bonemarrow)
+        #self.get_w2v_human(pancreas_train, pancreas_test, pancreas_train_labels, pancreas_test_labels, corpus_train_pancreas, spleen_train, spleen_test, spleen_train_labels, spleen_test_labels, corpus_train_spleen, bonemarrow_train, bonemarrow_test, bonemarrow_train_labels, bonemarrow_test_labels, corpus_train_bonemarrow)
 
         #self.bert_embed(brain_test, corpus_brain, brain_y)
         #self.bert_embed(spleen_x, corpus_spleen, spleen_y)
@@ -52,11 +52,39 @@ class data_pre():
         pancreas_train = pd.read_csv(self.path+'/train/human/human_cell_atlas/human_Pancreas9727_data.csv', header=0, index_col=0)
         pancreas_train_y = pd.read_csv(self.path+'/train/human/human_cell_atlas/human_Pancreas9727_celltype.csv')['Cell_type']
             
-        pancreas_test = pd.concat([pd.read_csv(self.path+'/test/human/human_cell_atlas/human_Pancreas2227_data.csv', header=0, index_col=0),
-                             pd.read_csv(self.path+'/test/human/human_cell_atlas/human_Pancreas1841_data.csv', header=0, index_col=0)],axis=1, ignore_index=False)
-        pancreas_test_y = pd.concat([pd.read_csv(self.path+'/test/human/human_cell_atlas/human_Pancreas2227_celltype.csv')['Cell_type'],
-                              pd.read_csv(self.path+'/test/human/human_cell_atlas/human_Pancreas1841_celltype.csv')['Cell_type']], axis=0, ignore_index=True).reset_index(drop=True)
+        pancreas_test = pd.concat([pd.read_csv(self.path+'/test/human/human_test_data/human_Pancreas2227_data.csv', header=0, index_col=0),
+                             pd.read_csv(self.path+'/test/human/human_test_data/human_Pancreas1841_data.csv', header=0, index_col=0)],axis=1, ignore_index=False)
+        pancreas_test_y = pd.concat([pd.read_csv(self.path+'/test/human/human_test_data/human_Pancreas2227_celltype.csv')['Cell_type'],
+                              pd.read_csv(self.path+'/test/human/human_test_data/human_Pancreas1841_celltype.csv')['Cell_type']], axis=0, ignore_index=True).reset_index(drop=True)
         
+        #removes labels with only one occurence 
+        name_counts = pancreas_train_y.value_counts()
+
+        unique_name = name_counts[name_counts == 1].index
+        
+        unique_index = pancreas_train_y[pancreas_train_y.isin(unique_name)].index
+
+        print(f"Unique name train: {unique_name}, Index: {unique_index}")
+
+        pancreas_train_y.drop(unique_index, inplace=True)
+        pancreas_train = pancreas_train.T.reset_index(drop=True)
+        pancreas_train.drop(unique_index, inplace=True)
+        pancreas_train = pancreas_train.T
+
+        name_counts = pancreas_test_y.value_counts()
+
+        unique_name = name_counts[name_counts == 1].index
+        
+        unique_index = pancreas_test_y[pancreas_test_y.isin(unique_name)].index
+
+        print(f"Unique name train: {unique_name}, Index: {unique_index}")
+
+        pancreas_test_y.drop(unique_index, inplace=True)
+        pancreas_test = pancreas_test.T.reset_index(drop=True)
+        pancreas_test.drop(unique_index, inplace=True)
+        pancreas_test = pancreas_test.T
+
+
         combined_pancreas_labels = pd.concat([pancreas_train_y, pancreas_test_y], axis=0, ignore_index=True).reset_index(drop=True)
         train_genes = set(pancreas_train.index)
         test_genes = set(pancreas_test.index)
@@ -79,7 +107,7 @@ class data_pre():
         combined_pancreas_filtered = combined_pancreas[(row_stds > low_std_percentile) & (row_stds < high_std_percentile)]
      
         pancreas_train, pancreas_test, pancreas_train_labels, pancreas_test_labels = train_test_split(combined_pancreas_filtered.T, combined_pancreas_labels, test_size=0.2, random_state=self.seed, stratify=combined_pancreas_labels)
-
+        print('it split')
         pancreas_train=pancreas_train.T
         pancreas_test = pancreas_test.T
 
@@ -95,11 +123,38 @@ class data_pre():
         Human Spleen
         '''
         spleen_train = pd.read_csv(self.path+'/train/human/human_cell_atlas/human_Spleen15806_data.csv', header=0, index_col=0)
-        spleen_train_y = pd.read_csv(self.path+'/train/human/human_cell_atlas/human_Pancreas15806_celltype.csv')['Cell_type']
+        spleen_train_y = pd.read_csv(self.path+'/train/human/human_cell_atlas/human_Spleen15806_celltype.csv')['Cell_type']
             
-        spleen_test = pd.read_csv(self.path+'/test/human/human_cell_atlas/human_Spleen9887_data.csv', header=0, index_col=0)
-        spleen_test_y = pd.read_csv(self.path+'/test/human/human_cell_atlas/human_Pancreas9887_celltype.csv')['Cell_type']
+        spleen_test = pd.read_csv(self.path+'/test/human/human_test_data/human_Spleen9887_data.csv', header=0, index_col=0)
+        spleen_test_y = pd.read_csv(self.path+'/test/human/human_test_data/human_Spleen9887_celltype.csv')['Cell_type']
+
+        #removes labels with only one occurence 
+        name_counts = spleen_train_y.value_counts()
+
+        unique_name = name_counts[name_counts == 1].index
         
+        unique_index = spleen_train_y[spleen_train_y.isin(unique_name)].index
+
+        print(f"Unique name train: {unique_name}, Index: {unique_index}")
+
+        spleen_train_y.drop(unique_index, inplace=True)
+        spleen_train = spleen_train.T.reset_index(drop=True)
+        spleen_train.drop(unique_index, inplace=True)
+        spleen_train = spleen_train.T
+
+        name_counts = spleen_test_y.value_counts()
+
+        unique_name = name_counts[name_counts == 1].index
+        
+        unique_index = spleen_test_y[spleen_test_y.isin(unique_name)].index
+
+        print(f"Unique name train: {unique_name}, Index: {unique_index}")
+
+        spleen_test_y.drop(unique_index, inplace=True)
+        spleen_test = spleen_test.T.reset_index(drop=True)
+        spleen_test.drop(unique_index, inplace=True)
+        spleen_test = spleen_test.T
+
         combined_spleen_labels = pd.concat([spleen_train_y, spleen_test_y], axis=0, ignore_index=True).reset_index(drop=True)
         train_genes = set(spleen_train.index)
         test_genes = set(spleen_test.index)
@@ -126,8 +181,8 @@ class data_pre():
         spleen_train=spleen_train.T
         spleen_test = spleen_test.T
 
-        spleen_train.to_csv(self.path+'/normalized_spleen_train.csv', index=True, header=True)
-        spleen_test.to_csv(self.path+'/normalized_spleen_test.csv', index=True, header=True)      
+        spleen_train.to_csv(self.path+'/normalized_spleen_human_train.csv', index=True, header=True)
+        spleen_test.to_csv(self.path+'/normalized_spleen_human_test.csv', index=True, header=True)      
 
         corpus_train_spleen = []
         for c_name in spleen_train.columns:
@@ -142,7 +197,34 @@ class data_pre():
             
         bonemarrow_test = pd.read_csv(self.path+'/train/human/human_cell_atlas/human_Bone_marrow6443_data.csv', header=0, index_col=0)
         bonemarrow_test_y = pd.read_csv(self.path+'/train/human/human_cell_atlas/human_Bone_marrow6443_celltype.csv')['Cell_type']
+
+        #removes labels with only one occurence 
+        name_counts = bonemarrow_train_y.value_counts()
+
+        unique_name = name_counts[name_counts == 1].index
         
+        unique_index = bonemarrow_train_y[bonemarrow_train_y.isin(unique_name)].index
+
+        print(f"Unique name train: {unique_name}, Index: {unique_index}")
+
+        bonemarrow_train_y.drop(unique_index, inplace=True)
+        bonemarrow_train = bonemarrow_train.T.reset_index(drop=True)
+        bonemarrow_train.drop(unique_index, inplace=True)
+        bonemarrow_train = bonemarrow_train.T
+
+        name_counts = bonemarrow_test_y.value_counts()
+
+        unique_name = name_counts[name_counts == 1].index
+        
+        unique_index = bonemarrow_test_y[bonemarrow_test_y.isin(unique_name)].index
+
+        print(f"Unique name train: {unique_name}, Index: {unique_index}")
+
+        bonemarrow_test_y.drop(unique_index, inplace=True)
+        bonemarrow_test = bonemarrow_test.T.reset_index(drop=True)
+        bonemarrow_test.drop(unique_index, inplace=True)
+        bonemarrow_test = bonemarrow_test.T
+
         combined_bonemarrow_labels = pd.concat([bonemarrow_train_y, bonemarrow_test_y], axis=0, ignore_index=True).reset_index(drop=True)
         train_genes = set(bonemarrow_train.index)
         test_genes = set(bonemarrow_test.index)
@@ -499,4 +581,4 @@ class data_pre():
 
         print(outputs)
         return outputs
-data = data_pre()
+#data = data_pre()

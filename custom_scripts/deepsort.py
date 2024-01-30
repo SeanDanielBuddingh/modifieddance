@@ -71,8 +71,8 @@ def train_pipeline(n_components: int = 400, log_level: LogLevel = "INFO"):
         SetConfig({"label_channel": "cell_type"}),
         log_level=log_level,
     )
-dataset = ScDeepSortDataset(species="mouse", tissue="Brain",
-                            train_dataset=["999"], test_dataset=["9999"], data_dir = data_dir_)
+dataset = ScDeepSortDataset(species="mouse", tissue="Kidney",
+                            train_dataset=["4682"], test_dataset=["203"], data_dir = data_dir_)
 data = dataset.load_data()
 #preprocessing_pipeline(data)
 #data = [train_inputs, test_inputs, 0, 0, 0]
@@ -112,7 +112,7 @@ plt.show()
 with torch.no_grad():
     result = model.predict_proba(graph=data.data.uns["CellFeatureGraph"])
 
-result = result[-1347:]
+result = result[-len(y_test):]
 result = torch.tensor(result)
 predicted = torch.argmax(result, 1)
 #torch.set_printoptions(profile="full")
@@ -121,7 +121,7 @@ correct = (predicted == y_test).sum().item()
 total = y_test.numel()
 accuracy = correct / total
 
-macro_auc = roc_auc_score(data.get_test_data(return_type="torch")[1].cpu(), result.cpu().detach(), multi_class='ovo', average='macro')
+macro_auc = roc_auc_score(y_test.cpu(), result.cpu().detach(), multi_class='ovo', average='macro')
 f1 = f1_score(y_test.cpu(), predicted.cpu(), average='macro')
 precision = precision_score(y_test.cpu(), predicted.cpu(), average='macro')
 recall = recall_score(y_test.cpu(), predicted.cpu(), average='macro')
@@ -136,3 +136,4 @@ print(f"F1: {f1}")
 print(f"Precision: {precision}")
 print(f"Recall: {recall}")
 print(f"Specificity: {specificity}")
+
