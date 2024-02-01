@@ -22,6 +22,7 @@ import gc
 from scipy.sparse import csr_matrix
 import dgl
 import copy
+from torcheval.metrics import MulticlassAUROC
 
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import roc_auc_score, f1_score, precision_score, recall_score, confusion_matrix
@@ -65,7 +66,7 @@ def mix_data(seed, inputs, targets):
 in_channels = 100
 hidden_channels = 100
 out_channels = 100
-num_classes = 21
+num_classes = 20
 
 device = torch.device('cpu' if torch.cuda.is_available() else 'cpu')
 seed = 42
@@ -74,8 +75,8 @@ set_seed(42)
 #Celltypist
 model = Celltypist(majority_voting = False)
 preprocessing_pipeline = model.preprocessing_pipeline()
-dataset = ScDeepSortDataset(species="mouse", tissue="Brain",
-                            train_dataset=["753", "3285"], test_dataset=["2695"], data_dir = data_dir_)
+dataset = ScDeepSortDataset(species="mouse", tissue="Kidney",
+                            train_dataset=["4682"], test_dataset=["203"], data_dir = data_dir_)
 data = dataset.load_data()
 preprocessing_pipeline(data)
 
@@ -113,7 +114,8 @@ probs = model.classifier.predict_proba(x_test.numpy())
 
 acc = accuracy_score(y_test.cpu(), pred)
 
-macro_auc = roc_auc_score(F.one_hot(y_test, num_classes=16).cpu(), probs, multi_class='ovo', average='macro')
+auc = MulticlassAUROC(num_classes=num_classes)
+auc.update(torch.as_tensor(probs).cpu(), y_test.cpu())
 f1 = f1_score(y_test.cpu(), pred, average='macro')
 precision = precision_score(y_test.cpu(), pred, average='macro')
 recall = recall_score(y_test.cpu(), pred, average='macro')
@@ -123,7 +125,7 @@ cm = confusion_matrix(y_test.cpu(), pred)
 specificity = np.sum(np.diag(cm)) / np.sum(cm)
 
 print(f"ACC: {acc}")
-print(f"Macro AUC: {macro_auc}")
+print(f"Macro AUC: {auc.compute()}")
 print(f"F1: {f1}")
 print(f"Precision: {precision}")
 print(f"Recall: {recall}")

@@ -49,7 +49,7 @@ class WordSAGE(torch.nn.Module):
     def __init__(self, in_channels, hidden_channels, out_channels, num_classes):
         super(WordSAGE, self).__init__()
         self.seed = 42
-        self.self_attention = torch.nn.MultiheadAttention(hidden_channels, num_heads=4)
+        self.self_attention = torch.nn.MultiheadAttention(hidden_channels, num_heads=1)
         self.conv1 = SAGEConv(in_channels, hidden_channels, aggregator_type='mean')
         self.conv2 = SAGEConv(hidden_channels, out_channels, aggregator_type='mean')
         self.classifier = torch.nn.Linear(out_channels, num_classes)
@@ -184,7 +184,7 @@ class WordSAGE(torch.nn.Module):
         combined_shuffled = combined.sample(frac=1).reset_index(drop=True)
 
         # Convert each row of targets to a single list
-        targets_shuffled = combined_shuffled.iloc[:, 500:]
+        targets_shuffled = combined_shuffled.iloc[:, 2500:]
         ls = []
         for row in targets_shuffled.iloc:
             new = [row]
@@ -193,7 +193,7 @@ class WordSAGE(torch.nn.Module):
         targets_shuffled = ls
 
         # Separate inputs and targets
-        inputs_shuffled = combined_shuffled.iloc[:, :500]
+        inputs_shuffled = combined_shuffled.iloc[:, :2500]
         #print(targets_shuffled)
         return inputs_shuffled, targets_shuffled
 
@@ -201,8 +201,8 @@ class WordSAGE(torch.nn.Module):
 device = torch.device('cpu' if torch.cuda.is_available() else 'cpu')
 seed = 42
 set_seed(42)
-in_channels = 500
-hidden_channels = 500
+in_channels = 2500
+hidden_channels = 2500
 out_channels = 100
 num_classes = 15451
 model = WordSAGE(in_channels, hidden_channels, out_channels, num_classes).to(device)
@@ -232,8 +232,8 @@ for epoch in range(300):
     loss.backward()
     optimizer.step()
 
-saved_features = pd.DataFrame(feature)
-feature.to_csv(data_dir_+"tuned_features.csv",index=False, header=False)
+saved_features = pd.DataFrame(feature.cpu().detach())
+saved_features.to_csv(data_dir_+"tuned_brain_train.csv",index=False, header=False)
 
 model.eval()
 with torch.no_grad():

@@ -21,6 +21,7 @@ import dgl
 import copy
 import pandas as pd
 from torch.utils.data import DataLoader
+from torcheval.metrics import MulticlassAUROC
 
 #ScDeepSort Imports
 from dance.modules.single_modality.cell_type_annotation.scdeepsort import ScDeepSort
@@ -174,7 +175,7 @@ set_seed(42)
 in_channels = 2500
 hidden_channels = 2500
 out_channels = 100
-num_classes = 16
+num_classes = 21
 model = WordSAGE(in_channels, hidden_channels, out_channels, num_classes).to(device)
 train_graph, train_targets, test_graph, test_targets, train_nodes, test_nodes = WordSAGE.read_data(self=model, seed=seed)
 
@@ -210,8 +211,9 @@ with torch.no_grad():
     pred = torch.argmax(test_out, 1)
 
     acc = accuracy_score(test_targets.cpu(), pred.cpu())
-
-    macro_auc = roc_auc_score(F.one_hot(test_targets, num_classes=num_classes).cpu(), prob[(range(test_nodes))].cpu(), multi_class='ovo', average='macro')
+    
+    auc = MulticlassAUROC(num_classes=num_classes)
+    auc.update(prob[(range(test_nodes))].cpu(), test_targets.cpu())
     f1 = f1_score(test_targets.cpu(), pred.cpu(), average='macro')
     precision = precision_score(test_targets.cpu(), pred.cpu(), average='macro')
     recall = recall_score(test_targets.cpu(), pred.cpu(), average='macro')
@@ -221,7 +223,7 @@ with torch.no_grad():
     specificity = np.sum(np.diag(cm)) / np.sum(cm)
 
     print(f"ACC: {acc}")
-    print(f"Macro AUC: {macro_auc}")
+    print(f"Macro AUC: {auc.compute()}")
     print(f"F1: {f1}")
     print(f"Precision: {precision}")
     print(f"Recall: {recall}")

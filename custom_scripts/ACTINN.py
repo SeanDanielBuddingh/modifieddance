@@ -169,12 +169,12 @@ def mix_data(seed, inputs, targets):
 #ACTINN
 set_seed(42)
 print(torch.cuda.is_available())
-device=torch.device('cuda')
-model = ACTINN(lambd=0.01, device='cuda')
+device=torch.device('cpu')
+model = ACTINN(lambd=0.01, device='cpu')
 
 preprocessing_pipeline = model.preprocessing_pipeline(normalize=True, filter_genes=True)
-dataset = ScDeepSortDataset(species="mouse", tissue="Kidney",
-                            train_dataset=["4682"], test_dataset=["203"], data_dir = data_dir_)
+dataset = ScDeepSortDataset(species="human", tissue="Pancreas",
+                            train_dataset=["9727"], test_dataset=["2227", "1841"], data_dir = data_dir_)
 data = dataset.load_data()
 preprocessing_pipeline(data)
 x_train, y_train = data.get_train_data(return_type="torch")
@@ -182,7 +182,7 @@ x_test, y_test = data.get_test_data(return_type="torch")
 seed = 42
 y_train = torch.argmax(y_train, dim=1)
 y_test = torch.argmax(y_test, dim=1)
-num_classes = len(torch.unique(torch.cat([y_train, y_test], dim=0)))
+
 print(torch.unique(y_train))
 print(torch.unique(y_test))
 
@@ -192,10 +192,14 @@ import pandas as pd
 combined = pd.DataFrame(combined)
 y_comb = pd.DataFrame(y_comb)
 inputs, targets = mix_data(seed, combined, y_comb)
+
+
+
 x_train, x_test, y_train, y_test = train_test_split(inputs, targets, test_size=0.2, random_state=seed, stratify=targets)
+
 y_train = torch.tensor(y_train[0].values, dtype=torch.long).to(device)
 y_test = torch.tensor(y_test[0].values, dtype=torch.long).to(device)
-
+num_classes = len(torch.unique(torch.cat([y_train, y_test], dim=0)))
 x_train = torch.tensor(x_train.to_numpy(), dtype=torch.float32).to(device)
 x_test = torch.tensor(x_test.to_numpy(), dtype=torch.float32).to(device)
 

@@ -16,6 +16,7 @@ import pandas as pd
 import dgl
 import copy
 import gc
+from torcheval.metrics import MulticlassAUROC
 
 from sklearn.metrics import roc_auc_score, f1_score, precision_score, recall_score, confusion_matrix
 
@@ -43,7 +44,7 @@ train_accuracies = []
 in_channels = 400
 hidden_channels = 400
 out_channels = 100
-num_classes = 21
+
 
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -71,8 +72,8 @@ def train_pipeline(n_components: int = 400, log_level: LogLevel = "INFO"):
         SetConfig({"label_channel": "cell_type"}),
         log_level=log_level,
     )
-dataset = ScDeepSortDataset(species="mouse", tissue="Kidney",
-                            train_dataset=["4682"], test_dataset=["203"], data_dir = data_dir_)
+dataset = ScDeepSortDataset(species="human", tissue="Pancreas",
+                            train_dataset=["9727"], test_dataset=["2227", "1841"], data_dir = data_dir_)
 data = dataset.load_data()
 #preprocessing_pipeline(data)
 #data = [train_inputs, test_inputs, 0, 0, 0]
@@ -80,7 +81,10 @@ train_pipeline()(data)
 
 y_train = data.get_train_data(return_type="torch")[1]
 y_test = data.get_test_data(return_type="torch")[1]
+print(y_train)
+print(y_test)
 y_train = torch.cat([y_train, y_test], dim=0)
+num_classes = len(torch.unique(torch.cat([y_train, y_test], dim=0)))
 y_train = torch.argmax(y_train, 1)
 y_test = torch.argmax(y_test, 1)
 #print(y_train)
@@ -121,7 +125,8 @@ correct = (predicted == y_test).sum().item()
 total = y_test.numel()
 accuracy = correct / total
 
-macro_auc = roc_auc_score(y_test.cpu(), result.cpu().detach(), multi_class='ovo', average='macro')
+auc = MulticlassAUROC(num_classes=num_classes)
+auc.update(result.cpu(), y_test.cpu())
 f1 = f1_score(y_test.cpu(), predicted.cpu(), average='macro')
 precision = precision_score(y_test.cpu(), predicted.cpu(), average='macro')
 recall = recall_score(y_test.cpu(), predicted.cpu(), average='macro')
@@ -131,7 +136,7 @@ cm = confusion_matrix(y_test.cpu(), predicted.cpu())
 specificity = np.sum(np.diag(cm)) / np.sum(cm)
 
 print(f"ACC: {accuracy}")
-print(f"Macro AUC: {macro_auc}")
+print(f"Macro AUC: {auc.compute()}")
 print(f"F1: {f1}")
 print(f"Precision: {precision}")
 print(f"Recall: {recall}")

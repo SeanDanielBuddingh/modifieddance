@@ -14,6 +14,8 @@ from scipy.sparse import csr_matrix
 import dgl
 import copy
 
+from torcheval.metrics import MulticlassAUROC
+
 #ScDeepSort Imports
 from dance.modules.single_modality.cell_type_annotation.scdeepsort import ScDeepSort
 from dance.utils import set_seed
@@ -43,7 +45,7 @@ set_seed(42)
 in_channels = 100
 hidden_channels = 100
 out_channels = 100
-num_classes = 16
+num_classes = 21
 model = WordSAGE(in_channels, hidden_channels, out_channels, num_classes).to(device)
 train_inputs, test_inputs, train_targets, test_targets = WordSAGE.read_data(self=model, seed=seed)
 #print(train_inputs)
@@ -68,7 +70,8 @@ acc = accuracy_score(test_targets.cpu(), pred.cpu())
 print(set(test_targets.cpu().numpy()))
 print(F.softmax(model.model(test_inputs).cpu()).detach())
 
-macro_auc = roc_auc_score(F.one_hot(test_targets, num_classes=num_classes).cpu(), F.softmax(model.model(test_inputs).cpu()).detach(), multi_class='ovo', average='macro')
+auc = MulticlassAUROC(num_classes=num_classes)
+auc.update(F.softmax(model.model(test_inputs).cpu()).detach(), test_targets.cpu())
 f1 = f1_score(test_targets.cpu(), pred.cpu(), average='macro')
 precision = precision_score(test_targets.cpu(), pred.cpu(), average='macro')
 recall = recall_score(test_targets.cpu(), pred.cpu(), average='macro')
@@ -78,7 +81,7 @@ cm = confusion_matrix(test_targets.cpu(), pred.cpu())
 specificity = np.sum(np.diag(cm)) / np.sum(cm)
 
 print(f"ACC: {acc}")
-print(f"Macro AUC: {macro_auc}")
+print(f"Macro AUC: {auc.compute()}")
 print(f"F1: {f1}")
 print(f"Precision: {precision}")
 print(f"Recall: {recall}")

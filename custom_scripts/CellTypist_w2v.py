@@ -22,6 +22,7 @@ import gc
 from scipy.sparse import csr_matrix
 import dgl
 import copy
+from torcheval.metrics import MulticlassAUROC
 
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import roc_auc_score, f1_score, precision_score, recall_score, confusion_matrix
@@ -47,7 +48,7 @@ from dance.modules.single_modality.cell_type_annotation.actinn import ACTINN
 from dance.modules.single_modality.cell_type_annotation.celltypist import Celltypist, Classifier
 
 
-from WordSage import WordSAGE
+from WordSageimport import WordSAGE
 
 #Celltypist
 
@@ -57,7 +58,7 @@ set_seed(42)
 in_channels = 100
 hidden_channels = 100
 out_channels = 100
-num_classes = 16
+num_classes = 21
 model = WordSAGE(in_channels, hidden_channels, out_channels, num_classes).to(device)
 x_train, x_test, y_train, y_test = WordSAGE.read_data(self=model, seed=seed)
 
@@ -83,7 +84,8 @@ probs = model.classifier.predict_proba(x_test.numpy())
 
 acc = accuracy_score(y_test.cpu(), pred)
 
-macro_auc = roc_auc_score(F.one_hot(y_test, num_classes=16).cpu(), probs, multi_class='ovo', average='macro')
+auc = MulticlassAUROC(num_classes=num_classes)
+auc.update(torch.as_tensor(probs).cpu(), y_test.cpu())
 f1 = f1_score(y_test.cpu(), pred, average='macro')
 precision = precision_score(y_test.cpu(), pred, average='macro')
 recall = recall_score(y_test.cpu(), pred, average='macro')
@@ -93,7 +95,7 @@ cm = confusion_matrix(y_test.cpu(), pred)
 specificity = np.sum(np.diag(cm)) / np.sum(cm)
 
 print(f"ACC: {acc}")
-print(f"Macro AUC: {macro_auc}")
+print(f"Macro AUC: {auc.compute()}")
 print(f"F1: {f1}")
 print(f"Precision: {precision}")
 print(f"Recall: {recall}")
