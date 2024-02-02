@@ -203,11 +203,11 @@ seed = 42
 set_seed(42)
 in_channels = 2500
 hidden_channels = 2500
-out_channels = 100
+out_channels = 2500
 num_classes = 15451
 model = WordSAGE(in_channels, hidden_channels, out_channels, num_classes).to(device)
 train_graph, train_targets, test_graph, test_targets, train_nodes, test_nodes = WordSAGE.read_data(self=model, seed=seed)
-
+#test_graph, test_targets, train_graph, train_targets, test_nodes, train_nodes = WordSAGE.read_data(self=model, seed=seed)
 train_targets = torch.tensor(train_targets).to(device)
 test_targets = torch.tensor(test_targets).to(device)
 
@@ -224,21 +224,24 @@ test_graph = test_graph.to(device)
 train_input_nodes = torch.as_tensor(train_input_nodes, dtype=torch.long).to(device)
 test_input_nodes = torch.as_tensor(test_input_nodes, dtype=torch.long).to(device)
 
-for epoch in range(300):
+for epoch in range(100):
+    print(epoch)
     model.train()
     optimizer.zero_grad()
     feature, out = model(train_graph, train_graph.ndata['features'])
+    if epoch == 0:
+        print(feature.cpu().detach()[(range(train_nodes))].shape, feature.cpu().detach()[(range(train_nodes))])
     loss = criterion(out[(range(train_nodes))], train_targets.squeeze(1))
     loss.backward()
     optimizer.step()
 
-saved_features = pd.DataFrame(feature.cpu().detach())
-saved_features.to_csv(data_dir_+"tuned_brain_train.csv",index=False, header=False)
+saved_features = pd.DataFrame(feature.cpu().detach()[(range(train_nodes))])
+saved_features.to_csv(data_dir_+"/tuned_brain_train.csv",index=False, header=False)
 
 model.eval()
 with torch.no_grad():
     feat, prob = model(test_graph, test_graph.ndata['features'])
-    test_loss = criterion(prob[(range(test_nodes))], test_targets)
+    test_loss = criterion(prob[(range(test_nodes))], test_targets.squeeze(1))
 
     test_out = F.softmax(prob[(range(test_nodes))])
     pred = torch.argmax(test_out, 1)
