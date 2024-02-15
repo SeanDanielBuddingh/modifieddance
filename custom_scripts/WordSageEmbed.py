@@ -52,16 +52,20 @@ class WordSAGE(torch.nn.Module):
         self.self_attention = torch.nn.MultiheadAttention(hidden_channels, num_heads=1)
         self.conv1 = SAGEConv(in_channels, hidden_channels, aggregator_type='mean')
         self.conv2 = SAGEConv(hidden_channels, out_channels, aggregator_type='mean')
-        self.classifier = torch.nn.Linear(out_channels, num_classes)
+
+        self.classifier = torch.nn.Sequential(
+            torch.nn.Linear(out_channels, out_channels),
+            torch.nn.ReLU(),
+            torch.nn.Linear(out_channels, num_classes))
 
     def forward(self, x, edge_index):
         h = self.conv1(x, edge_index)
-        h = F.relu(h)
+        h = F.leaky_relu(h)
         h, weights = self.self_attention(h,h,h)
-        h = F.relu(h)
-        h = F.dropout(h, p=0.5, training=self.training)
+        h = F.leaky_relu(h)
+        h = F.dropout(h, p=0.2, training=self.training)
         h = self.conv2(x, h)
-        x = F.relu(h)
+        x = F.leaky_relu(h)
         h = self.classifier(x)
         return x, h
 
@@ -81,15 +85,15 @@ class WordSAGE(torch.nn.Module):
         #print(set(targets_encoded_train))
 
         full_list_train = pd.DataFrame(np.zeros((normalized_train.shape[0], normalized_train.shape[1])), columns=normalized_train.columns, index=normalized_train.index)
-
+        
         for i, row in enumerate(normalized_train.iloc):
-            top100 = row.sort_values(ascending=False)[:99].index.tolist()
+            top100 = row.sort_values(ascending=False)[:2500].index.tolist()
             full_list_train.loc[i, top100] = 1
 
         full_list_test = pd.DataFrame(np.zeros((normalized_test.shape[0], normalized_test.shape[1])), columns=normalized_test.columns, index=normalized_test.index)
 
-        for row in normalized_test.iloc:
-            top100 = row.sort_values(ascending=False)[:99].index.tolist()
+        for i, row in enumerate(normalized_test.iloc):
+            top100 = row.sort_values(ascending=False)[:2500].index.tolist()
             full_list_test.loc[i, top100] = 1
 
         inputs_train, targets_train = self.mix_data(seed, tissue_train, full_list_train)
@@ -198,7 +202,7 @@ class WordSAGE(torch.nn.Module):
         return inputs_shuffled, targets_shuffled
 
 
-device = torch.device('cpu' if torch.cuda.is_available() else 'cpu')
+device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 seed = 42
 set_seed(42)
 in_channels = 2500
@@ -206,8 +210,8 @@ hidden_channels = 2500
 out_channels = 2500
 num_classes = 15451
 model = WordSAGE(in_channels, hidden_channels, out_channels, num_classes).to(device)
-train_graph, train_targets, test_graph, test_targets, train_nodes, test_nodes = WordSAGE.read_data(self=model, seed=seed)
-#test_graph, test_targets, train_graph, train_targets, test_nodes, train_nodes = WordSAGE.read_data(self=model, seed=seed)
+#train_graph, train_targets, test_graph, test_targets, train_nodes, test_nodes = WordSAGE.read_data(self=model, seed=seed)
+test_graph, test_targets, train_graph, train_targets, test_nodes, train_nodes = WordSAGE.read_data(self=model, seed=seed)
 train_targets = torch.tensor(train_targets).to(device)
 test_targets = torch.tensor(test_targets).to(device)
 
@@ -236,7 +240,7 @@ for epoch in range(100):
     optimizer.step()
 
 saved_features = pd.DataFrame(feature.cpu().detach()[(range(train_nodes))])
-saved_features.to_csv(data_dir_+"/tuned_brain_train.csv",index=False, header=False)
+saved_features.to_csv(data_dir_+"/tuned_brain_test.csv",index=False, header=False)
 
 model.eval()
 with torch.no_grad():

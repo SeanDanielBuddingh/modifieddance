@@ -548,8 +548,8 @@ class data_pre():
         print('printed')
 
     def read_w2v(self):
-        tissue_train = pd.read_csv(self.path+'/brain_train.csv', header=None)
-        tissue_test = pd.read_csv(self.path+'/brain_test.csv', header=None)
+        tissue_train = pd.read_csv(self.path+'/tuned_brain_train.csv', header=None)
+        tissue_test = pd.read_csv(self.path+'/tuned_brain_test.csv', header=None)
         genes = pd.read_csv(self.path+'/brain_w2v_genes.csv', header=None)
         y_values_train = pd.read_csv(self.path+'/brain_train_labels.csv', skiprows=1, header=None, dtype=str)
         y_values_test = pd.read_csv(self.path+'/brain_test_labels.csv', skiprows=1, header=None, dtype=str)

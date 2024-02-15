@@ -49,7 +49,11 @@ class WordSAGE(torch.nn.Module):
         self.seed = 42
         self.conv1 = SAGEConv(in_channels, hidden_channels, aggregator_type='mean')
         self.conv2 = SAGEConv(hidden_channels, out_channels, aggregator_type='mean')
-        self.classifier = torch.nn.Linear(out_channels, num_classes)
+
+        self.classifier = torch.nn.Sequential(
+            torch.nn.Linear(out_channels, out_channels),
+            torch.nn.ReLU(),
+            torch.nn.Linear(out_channels, num_classes))
 
     def forward(self, x, edge_index):
         h = self.conv1(x, edge_index)
@@ -174,8 +178,8 @@ seed = 42
 set_seed(42)
 in_channels = 2500
 hidden_channels = 2500
-out_channels = 100
-num_classes = 21
+out_channels = 2500
+num_classes = 16
 model = WordSAGE(in_channels, hidden_channels, out_channels, num_classes).to(device)
 train_graph, train_targets, test_graph, test_targets, train_nodes, test_nodes = WordSAGE.read_data(self=model, seed=seed)
 

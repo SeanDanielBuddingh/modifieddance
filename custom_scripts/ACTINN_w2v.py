@@ -45,7 +45,7 @@ set_seed(42)
 in_channels = 100
 hidden_channels = 100
 out_channels = 100
-num_classes = 21
+num_classes = 16
 model = WordSAGE(in_channels, hidden_channels, out_channels, num_classes).to(device)
 train_inputs, test_inputs, train_targets, test_targets = WordSAGE.read_data(self=model, seed=seed)
 #print(train_inputs)
