@@ -52,10 +52,10 @@ class WordSAGE(torch.nn.Module):
         self.seed = 42
         self.self_attention = torch.nn.MultiheadAttention(hidden_channels, num_heads=1)
         self.conv1 = SAGEConv(in_channels, hidden_channels, aggregator_type='mean')
-        self.bn1 = torch.nn.BatchNorm2d(hidden_channels)
+        self.bn1 = torch.nn.BatchNorm1d(hidden_channels)
         self.ln1 = torch.nn.LayerNorm(hidden_channels)
         self.conv2 = SAGEConv(hidden_channels, out_channels, aggregator_type='mean')
-        self.bn2 = torch.nn.BatchNorm2d(out_channels)
+        self.bn2 = torch.nn.BatchNorm1d(out_channels)
 
         self.linear = torch.nn.Linear(out_channels, out_channels)
         self.bce = torch.nn.Linear(out_channels, 1022)
