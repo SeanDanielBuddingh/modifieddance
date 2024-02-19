@@ -1,33 +1,81 @@
+import torch
+
 import numpy as np
 import pandas as pd
 import scanpy as sc
 
+import random
+
 import sys
 import os
 
-current_script_path = __file__
-current_dir = os.path.dirname(current_script_path)
-parent_dir = os.path.dirname(current_dir)
-sys.path.append(parent_dir)
-parent_parent = os.path.dirname(parent_dir)
-data_dir_ = parent_parent+'/dance_data'
+from data_pre import data_pre
 
+class GeneMarkers():
+    def __init__(self):
+        super(GeneMarkers, self).__init__()
 
-def read_w2v():
-    y_values_train = pd.read_csv(data_dir_.path+'/brain_train_labels.csv', skiprows=1, header=None, dtype=str)
-    y_values_test = pd.read_csv(data_dir_.path+'/brain_test_labels.csv', skiprows=1, header=None, dtype=str)
-    normalized_train = pd.read_csv(data_dir_.path+'/normalized_brain_train.csv', header=0, index_col=0)
-    normalized_test = pd.read_csv(data_dir_.path+'/normalized_brain_test.csv', header=0, index_col=0)
+    def FindGeneMarkers(self):
+        data = data_pre()
+        _, _, genes, y_values_train, y_values_test, normalized_train, normalized_test = data.read_w2v()
 
-    return y_values_train, y_values_test, normalized_train, normalized_test
+        obs_train = pd.DataFrame({'condition': y_values_train[0]})
+        obs_test = pd.DataFrame({'condition': y_values_test[0]})
 
-y_values_train, y_values_test, normalized_train, normalized_test = read_w2v()
+        adata1 = sc.AnnData(X=normalized_train.T.reset_index(drop=True), obs=obs_train)
+        adata2 = sc.AnnData(X=normalized_test.T.reset_index(drop=True), obs=obs_test)
+        adata = sc.concat([adata1, adata2], join="outer")
 
-adata1 = sc.AnnData(X=normalized_train, obs=dict(condition=y_values_train))
-adata2 = sc.AnnData(X=normalized_test, obs=dict(condition=y_values_test))
-adata = sc.concat([adata1, adata2], join="outer")
+        sc.tl.rank_genes_groups(adata, groupby='condition', method='t-test')
 
-sc.tl.rank_genes_groups(adata, groupby='condition', test_stat='wilcoxon')
+        results = adata.uns['rank_genes_groups']
 
-results = adata.uns['rank_genes_groups']['names']
-pvals, log2fc = adata.uns['rank_genes_groups']['pvals'] < 0.05 & adata.uns['rank_genes_groups']['log2fc'] > 1
+        groups = results['names'].dtype.names
+
+        dfs = {}
+        for group in groups:
+            df = pd.DataFrame({
+                'names': results['names'][group],
+                'pvals': results['pvals'][group],
+                'logfoldchanges': results['logfoldchanges'][group]
+            })
+            df = df.sort_values('pvals', ascending=True)
+            dfs[group] = df
+
+        return dfs, genes, y_values_train, y_values_test
+
+    def ConstructTargets(self):
+        dfs, genes, y_values_train, y_values_test = self.FindGeneMarkers()
+        gene_idx = genes.index
+
+        all_names = []
+        for group, df in dfs.items():
+            all_names.extend(df['names'].iloc[:100].tolist())
+
+        unique_names = pd.unique(all_names)
+        unique_names_series = pd.Series(unique_names)
+        print('\nnum_classes: ', len(unique_names_series))
+
+        targets = {}
+        for group, df in dfs.items():
+            group_idx = unique_names_series[unique_names_series.isin(df['names'].iloc[:100].tolist())].index
+            target = np.zeros(len(unique_names_series))
+            target[group_idx] = 1
+            targets[group] = target
+
+        ft_y_train = []
+        for target in y_values_train[0]:
+            new_target = targets[target]
+            ft_y_train.append(new_target)
+
+        ft_y_train = pd.DataFrame(ft_y_train)
+
+        ft_y_test = []
+        for target in y_values_test[0]:
+            new_target = targets[target]
+            ft_y_test.append(new_target)
+
+        ft_y_test= pd.DataFrame(ft_y_test)
+
+        print('\nTargets Constructed.\n')
+        return ft_y_train, ft_y_test
