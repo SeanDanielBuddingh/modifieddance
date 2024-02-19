@@ -52,19 +52,25 @@ class WordSAGE(torch.nn.Module):
         self.seed = 42
         self.self_attention = torch.nn.MultiheadAttention(hidden_channels, num_heads=1)
         self.conv1 = SAGEConv(in_channels, hidden_channels, aggregator_type='mean')
+        self.bn1 = torch.nn.BatchNorm2d(hidden_channels)
+        self.ln1 = torch.nn.LayerNorm(hidden_channels)
         self.conv2 = SAGEConv(hidden_channels, out_channels, aggregator_type='mean')
+        self.bn2 = torch.nn.BatchNorm2d(out_channels)
 
         self.linear = torch.nn.Linear(out_channels, out_channels)
-        self.bce = torch.nn.Linear(out_channels, 145)
-        self.ce = torch.nn.Linear(145, num_classes)
+        self.bce = torch.nn.Linear(out_channels, 1022)
+        self.ce = torch.nn.Linear(1022, num_classes)
 
     def forward(self, x, edge_index):
         h = self.conv1(x, edge_index)
+        h = self.bn1(h)
         h = F.leaky_relu(h)
         h, weights = self.self_attention(h,h,h)
+        h = self.ln1(h)
         h = F.leaky_relu(h)
         h = F.dropout(h, p=0.2, training=self.training)
         h = self.conv2(x, h)
+        h = self.bn2(h)
         x = F.leaky_relu(h)
         #decoder
         h = self.linear(h)
@@ -238,7 +244,9 @@ for epoch in range(25):
     feature, bce, out = model(train_graph, train_graph.ndata['features'])
     bce_cells = bce[(range(train_nodes))]
     out_cells = out[(range(train_nodes))]
-    loss = 0.05*bce_loss(bce_cells, bce_train_targets.squeeze(1)) + ce_loss(out_cells, train_targets.squeeze(1))
+    bce_loss_value = bce_loss(bce_cells, bce_train_targets.squeeze(1))
+    ce_loss_value = ce_loss(out_cells, train_targets.squeeze(1))
+    loss = ce_loss_value + bce_loss_value
     count=0
     for feat_out, target_out in zip(bce_cells, bce_train_targets.squeeze(1)):
         for logit, correct in zip(feat_out, target_out):
@@ -258,10 +266,10 @@ for epoch in range(25):
         correct_predictions += (target_out.detach().numpy() == feat_out.detach().numpy())
         total_predictions += 1
     ce_acc = correct_predictions / total_predictions
-    if (epoch+1) % 1 == 0:
-        print(f"[UPDATE] [EPOCH {epoch + 1}] Classification Loss: {loss:.4f} | BCE_Acc: {bce_acc:.4f} | CE_Acc: {ce_acc:.4f}")
     loss.backward()
     optimizer.step()
+    if (epoch+1) % 1 == 0:
+        print(f"[UPDATE] [EPOCH {epoch + 1}] BCE Loss: {bce_loss_value:.4f} | CE Loss: {ce_loss_value:.4f} | Total Loss: {loss:.4f} | BCE_Acc: {bce_acc:.4f} | CE_Acc: {ce_acc:.4f}")
 
 saved_features = pd.DataFrame(feature.cpu().detach()[(range(train_nodes))])
 saved_features.to_csv(data_dir_+"/tuned_brain_train.csv",index=False, header=False)
@@ -279,7 +287,9 @@ for epoch in range(25):
     feature, bce, out = model(test_graph, test_graph.ndata['features'])
     bce_cells = bce[(range(test_nodes))]
     out_cells = out[(range(test_nodes))]
-    loss = 0.05*bce_loss(bce_cells, bce_test_targets.squeeze(1)) + ce_loss(out_cells, test_targets.squeeze(1))
+    bce_loss_value = bce_loss(bce_cells, bce_test_targets.squeeze(1))
+    ce_loss_value = ce_loss(out_cells, test_targets.squeeze(1))
+    loss = ce_loss_value + bce_loss_value
     count=0
     for feat_out, target_out in zip(bce_cells, bce_test_targets.squeeze(1)):
         for logit, correct in zip(feat_out, target_out):
@@ -299,10 +309,10 @@ for epoch in range(25):
         correct_predictions += (target_out.detach().numpy() == feat_out.detach().numpy())
         total_predictions += 1
     ce_acc = correct_predictions / total_predictions
-    if (epoch+1) % 1 == 0:
-        print(f"[UPDATE] [EPOCH {epoch + 1}] Classification Loss: {loss:.4f} | BCE_Acc: {bce_acc:.4f} | CE_Acc: {ce_acc:.4f}")
     loss.backward()
     optimizer.step()
+    if (epoch+1) % 1 == 0:
+        print(f"[UPDATE] [EPOCH {epoch + 1}] BCE Loss: {bce_loss_value:.4f} | CE Loss: {ce_loss_value:.4f} | Total Loss: {loss:.4f} | BCE_Acc: {bce_acc:.4f} | CE_Acc: {ce_acc:.4f}")
 
 saved_features = pd.DataFrame(feature.cpu().detach()[(range(test_nodes))])
 saved_features.to_csv(data_dir_+"/tuned_brain_test.csv",index=False, header=False)
