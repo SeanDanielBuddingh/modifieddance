@@ -58,8 +58,8 @@ class WordSAGE(torch.nn.Module):
         self.bn2 = torch.nn.BatchNorm1d(out_channels)
 
         self.linear = torch.nn.Linear(out_channels, out_channels)
-        self.bce = torch.nn.Linear(out_channels, 1022)
-        self.ce = torch.nn.Linear(1022, num_classes)
+        self.bce = torch.nn.Linear(out_channels, 145)
+        self.ce = torch.nn.Linear(out_channels, num_classes)
 
     def forward(self, x, edge_index):
         h = self.conv1(x, edge_index)
@@ -75,10 +75,12 @@ class WordSAGE(torch.nn.Module):
         #decoder
         h = self.linear(h)
         h = F.relu(h)
-        h = self.bce(h)
-        y = F.relu(h)
-        y = self.ce(y)
-        return x, h, y
+
+        b = self.bce(h)
+
+        y = self.ce(h)
+
+        return x, b, y
 
     def read_data(self, seed):
         data = data_pre()
@@ -210,7 +212,7 @@ class WordSAGE(torch.nn.Module):
         return inputs_shuffled, bce_targets_shuffled, ce_targets_shuffled
 
 
-device = torch.device('cpu' if torch.cuda.is_available() else 'cpu')
+device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 seed = 42
 set_seed(42)
 in_channels = 2500
@@ -229,7 +231,12 @@ bce_test_targets = torch.tensor(bce_test_targets).to(device)
 
 bce_loss = torch.nn.BCEWithLogitsLoss()
 ce_loss = torch.nn.CrossEntropyLoss()
-optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
+
+#from adamp import AdamP
+#optimizer = AdamP(model.parameters(), lr=0.001)
+optimizer = torch.optim.SGD(model.parameters(), lr=0.01, momentum=0.9)
+
+#optimizer = torch.optim.AdamW(model.parameters(), lr=0.001)
 
 train_input_nodes = [i for i in range(train_graph.number_of_nodes()) if i < train_nodes]
 test_input_nodes = [i for i in range(test_graph.number_of_nodes()) if i < test_nodes]
@@ -263,7 +270,7 @@ for epoch in range(25):
     for feat_out, target_out in zip(out_cells, train_targets.squeeze(1)):
         feat_out = F.softmax(feat_out)
         feat_out = torch.argmax(feat_out)
-        correct_predictions += (target_out.detach().numpy() == feat_out.detach().numpy())
+        correct_predictions += (target_out.detach().cpu().numpy() == feat_out.detach().cpu().numpy())
         total_predictions += 1
     ce_acc = correct_predictions / total_predictions
     loss.backward()
@@ -280,7 +287,8 @@ gc.collect()
 model = WordSAGE(in_channels, hidden_channels, out_channels, num_classes).to(device)
 bce_loss = torch.nn.BCEWithLogitsLoss()
 ce_loss = torch.nn.CrossEntropyLoss()
-optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
+optimizer = torch.optim.SGD(model.parameters(), lr=0.01, momentum=0.9)
+#optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
 
 for epoch in range(25):
     optimizer.zero_grad()
@@ -306,7 +314,7 @@ for epoch in range(25):
     for feat_out, target_out in zip(out_cells, test_targets.squeeze(1)):
         feat_out = F.softmax(feat_out)
         feat_out = torch.argmax(feat_out)
-        correct_predictions += (target_out.detach().numpy() == feat_out.detach().numpy())
+        correct_predictions += (target_out.detach().cpu().numpy() == feat_out.detach().cpu().numpy())
         total_predictions += 1
     ce_acc = correct_predictions / total_predictions
     loss.backward()
