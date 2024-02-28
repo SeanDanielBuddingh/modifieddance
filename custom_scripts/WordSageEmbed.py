@@ -1,5 +1,7 @@
 import os
 import sys
+import gc
+
 current_script_path = __file__
 current_dir = os.path.dirname(current_script_path)
 parent_dir = os.path.dirname(current_dir)
@@ -7,44 +9,24 @@ sys.path.append(parent_dir)
 parent_parent = os.path.dirname(parent_dir)
 parent_parent = parent_parent.replace("\\", "/")
 data_dir_ = parent_parent+'/dance_data'
+
 import torch
 import torch.nn.functional as F
 import numpy as np
-from dgl.nn import SAGEConv
-import networkx as nx
-from data_pre  import data_pre
-from differential import GeneMarkers
-from sklearn.model_selection import train_test_split
-from sklearn.metrics import roc_auc_score, f1_score, precision_score, recall_score, confusion_matrix
-from sklearn.preprocessing import LabelEncoder
-from torch_geometric.data import Data
-from sklearn.metrics import accuracy_score
-import gc
-from scipy.sparse import csr_matrix
-import dgl
-import copy
 import pandas as pd
-from torch.utils.data import DataLoader
 
-#ScDeepSort Imports
-from dance.modules.single_modality.cell_type_annotation.scdeepsort import ScDeepSort
-from dance.utils import set_seed
+from sklearn.preprocessing import LabelEncoder
+
+import dgl
+from dgl.nn import SAGEConv
 
 os.environ["DGLBACKEND"] = "pytorch"
-from pprint import pprint
-from dance.datasets.singlemodality import ScDeepSortDataset
 
-import scanpy as sc
-from dance.transforms import AnnDataTransform, FilterGenesPercentile
-from dance.transforms import Compose, SetConfig
-from dance.transforms.graph import PCACellFeatureGraph, CellFeatureGraph
-from dance.typing import LogLevel, Optional
+from data_pre  import data_pre
+from differential import GeneMarkers
 
-#ACTINN
-from dance.modules.single_modality.cell_type_annotation.actinn import ACTINN
+from dance.utils import set_seed
 
-#Celltypist
-from dance.modules.single_modality.cell_type_annotation.celltypist import Celltypist
 
 class WordSAGE(torch.nn.Module):
     def __init__(self, in_channels, hidden_channels, out_channels, num_classes):
@@ -58,7 +40,7 @@ class WordSAGE(torch.nn.Module):
         self.bn2 = torch.nn.BatchNorm1d(out_channels)
 
         self.linear = torch.nn.Linear(out_channels, out_channels)
-        self.bce = torch.nn.Linear(out_channels, 145)
+        self.bce = torch.nn.Linear(out_channels, num_classes*10)
         self.ce = torch.nn.Linear(out_channels, num_classes)
 
     def forward(self, x, edge_index):
@@ -104,35 +86,6 @@ class WordSAGE(torch.nn.Module):
         test_graph, test_nodes = self.basic_dgl_graph(inputs_test, genes, normalized_test)
 
         return train_graph, bce_targets_train, targets_train, test_graph, bce_targets_test, targets_test, train_nodes, test_nodes
-    
-    def basic_graph(self, train_inputs, genes, normalized):
-        G = nx.Graph()
-        for i in range(len(train_inputs)):
-                G.add_node(i, features=train_inputs.iloc[i, :])
-        nodes = int(G.number_of_nodes())
-        for i in range(len(genes)):
-                G.add_node(nodes+i, features=genes.iloc[i, 1:])
-        for cell_name in normalized:
-            if cell_name == '':
-                pass
-            vector = normalized[cell_name]
-            nonzero = vector[vector!=0]
-            for i, expression in enumerate(nonzero):
-                G.add_edge(int(cell_name), nodes+i, weight=expression)
-        del normalized
-        gc.collect()
-
-        adj = nx.adjacency_matrix(G)   
-        adj_tensor = torch.sparse_coo_tensor(
-            torch.LongTensor(np.vstack(adj.nonzero())),  
-            torch.FloatTensor(adj.data),                 
-            torch.Size(adj.shape)                        
-        )
-        edge_index = torch.tensor(list(G.edges), dtype=torch.long).t().contiguous()
-        x_list = [G.nodes[i]['features'] for i in G.nodes]
-        x = torch.tensor(x_list, dtype=torch.float)
-
-        return Data(x=x, edge_index=edge_index, adj_matrix=adj_tensor), nodes
 
     def basic_dgl_graph(self, train_inputs, genes, normalized):
         cell_name_to_index = {name: i for i, name in enumerate(normalized.keys())}
@@ -246,7 +199,7 @@ test_graph = test_graph.to(device)
 train_input_nodes = torch.as_tensor(train_input_nodes, dtype=torch.long).to(device)
 test_input_nodes = torch.as_tensor(test_input_nodes, dtype=torch.long).to(device)
 
-for epoch in range(25):
+for epoch in range(50):
     optimizer.zero_grad()
     feature, bce, out = model(train_graph, train_graph.ndata['features'])
     bce_cells = bce[(range(train_nodes))]
@@ -290,7 +243,7 @@ ce_loss = torch.nn.CrossEntropyLoss()
 optimizer = torch.optim.SGD(model.parameters(), lr=0.01, momentum=0.9)
 #optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
 
-for epoch in range(25):
+for epoch in range(50):
     optimizer.zero_grad()
     feature, bce, out = model(test_graph, test_graph.ndata['features'])
     bce_cells = bce[(range(test_nodes))]

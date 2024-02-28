@@ -90,12 +90,12 @@ class GeneMarkers():
         group_names = [all_names[i:i+sublist_length] for i in range(0, len(all_names), sublist_length)]
         group_names_df = pd.DataFrame(group_names)
 
-        unique_names = [pd.unique(group_names_df.values.flatten())]
+        unique_names = pd.unique(group_names_df.values.flatten())
         print('\nnum_classes: ', len(unique_names))
 
         targets = {}
         for i, (group, df) in enumerate(dfs.items()):
-            group_idx = [unique_names.index(name) for name in group_names[i]]
+            group_idx = [unique_names.tolist().index(name) for name in group_names[i]]
             target = np.zeros(len(unique_names))
             target[group_idx] = 1
             targets[group] = target
