@@ -152,7 +152,7 @@ class WordSAGE(torch.nn.Module):
         return G, num_train_nodes
 
     def mix_data(self, seed, inputs, bce_targets, ce_targets):
-        batch_size = 32
+        batch_size = 128
         np.random.seed(seed)
         print('Mixing Data\n')
         # Combine inputs and targets
@@ -193,7 +193,7 @@ class WordSAGE(torch.nn.Module):
         num_batches = len(data) // batch_size
         if len(data) % batch_size != 0:
             num_batches += 1
-
+        print('num batches: ', num_batches)
         batches = []
         for i in range(num_batches):
             if i == num_batches-1:
@@ -225,7 +225,12 @@ optimizer = torch.optim.SGD(model.parameters(), lr=0.01, momentum=0.9)
 for epoch in range(50):
     features_list = []
     targets_list = []
+    count=0
+    correct_predictions = 0
+    total_predictions = 0
+    bcc_denom = 0
     for train_graph, bce_targets_train, train_targets, train_nodes in zip(train_graphs, bce_targets_train_list, targets_train_list, train_nodes_list):
+
         train_targets = torch.tensor(train_targets.values, dtype=torch.long).to(device)
 
         bce_train_targets = torch.tensor(bce_targets_train.values.tolist()).to(device)
@@ -238,12 +243,12 @@ for epoch in range(50):
 
         optimizer.zero_grad()
         feature, bce, out = model(train_graph, train_graph.ndata['features'])
+
         bce_cells = bce[(range(train_nodes))]
         out_cells = out[(range(train_nodes))]
         bce_loss_value = bce_loss(bce_cells, bce_train_targets.squeeze(1))
         ce_loss_value = ce_loss(out_cells, train_targets.squeeze(1))
-        loss = ce_loss_value + bce_loss_value
-        count=0
+        loss = ce_loss_value + ( 0.1 * bce_loss_value )
         for feat_out, target_out in zip(bce_cells, bce_train_targets.squeeze(1)):
             for logit, correct in zip(feat_out, target_out):
                 logit = torch.sigmoid(logit)
@@ -253,11 +258,9 @@ for epoch in range(50):
                     logit = 0
                 if logit == correct:
                     count+=1
-        bce_acc= count/(len(target_out)*len(out_cells))
-        correct_predictions = 0
-        total_predictions = 0
+        bcc_denom += (len(target_out)*len(out_cells))
         for feat_out, target_out in zip(out_cells, train_targets.squeeze(1)):
-            feat_out = F.softmax(feat_out)
+            feat_out = F.softmax(feat_out, dim=0)
             feat_out = torch.argmax(feat_out)
             correct_predictions += (target_out.detach().cpu().numpy() == feat_out.detach().cpu().numpy())
             total_predictions += 1
@@ -266,11 +269,13 @@ for epoch in range(50):
         optimizer.step()
         features_list.append(feature.cpu().detach()[(range(train_nodes))])
         targets_list.append(train_targets)
+
+    bce_acc= count/bcc_denom
     if (epoch+1) % 1 == 0:
         print(f"[UPDATE TRAIN SET] [EPOCH {epoch + 1}] BCE Loss: {bce_loss_value:.4f} | CE Loss: {ce_loss_value:.4f} | Total Loss: {loss:.4f} | BCE_Acc: {bce_acc:.4f} | CE_Acc: {ce_acc:.4f}")
 
 features_dfs = [pd.DataFrame(tensor.numpy()) for tensor in features_list]
-targets_dfs = [pd.DataFrame(tensor.numpy()) for tensor in targets_list]
+targets_dfs = [pd.DataFrame(tensor.cpu().detach().numpy()) for tensor in targets_list]
 
 features_df = pd.concat(features_dfs, ignore_index=True)
 targets_df = pd.concat(targets_dfs, ignore_index=True)
@@ -289,9 +294,14 @@ optimizer = torch.optim.SGD(model.parameters(), lr=0.01, momentum=0.9)
 for epoch in range(50):
     features_list = []
     targets_list = []
+    count=0
+    correct_predictions = 0
+    total_predictions = 0
+    bcc_denom = 0
     for test_graph, bce_targets_test, test_targets, test_nodes in zip(test_graphs, bce_targets_test_list, targets_test_list, test_nodes_list):
+
         test_targets = torch.tensor(test_targets.values, dtype=torch.long).to(device)
-        print()
+
         bce_test_targets = torch.tensor(bce_targets_test.values.tolist()).to(device)
 
         test_input_nodes = [i for i in range(test_graph.number_of_nodes()) if i < test_nodes]
@@ -302,12 +312,12 @@ for epoch in range(50):
 
         optimizer.zero_grad()
         feature, bce, out = model(test_graph, test_graph.ndata['features'])
+
         bce_cells = bce[(range(test_nodes))]
         out_cells = out[(range(test_nodes))]
         bce_loss_value = bce_loss(bce_cells, bce_test_targets.squeeze(1))
         ce_loss_value = ce_loss(out_cells, test_targets.squeeze(1))
-        loss = ce_loss_value + bce_loss_value
-        count=0
+        loss = ce_loss_value + ( 0.1 * bce_loss_value )
         for feat_out, target_out in zip(bce_cells, bce_test_targets.squeeze(1)):
             for logit, correct in zip(feat_out, target_out):
                 logit = torch.sigmoid(logit)
@@ -317,11 +327,9 @@ for epoch in range(50):
                     logit = 0
                 if logit == correct:
                     count+=1
-        bce_acc= count/(len(target_out)*len(out_cells))
-        correct_predictions = 0
-        total_predictions = 0
+        bcc_denom += (len(target_out)*len(out_cells))
         for feat_out, target_out in zip(out_cells, test_targets.squeeze(1)):
-            feat_out = F.softmax(feat_out)
+            feat_out = F.softmax(feat_out, dim=0)
             feat_out = torch.argmax(feat_out)
             correct_predictions += (target_out.detach().cpu().numpy() == feat_out.detach().cpu().numpy())
             total_predictions += 1
@@ -330,11 +338,13 @@ for epoch in range(50):
         optimizer.step()
         features_list.append(feature.cpu().detach()[(range(test_nodes))])
         targets_list.append(test_targets)
+        
+    bce_acc= count/bcc_denom
     if (epoch+1) % 1 == 0:
-        print(f"[UPDATE TRAIN SET] [EPOCH {epoch + 1}] BCE Loss: {bce_loss_value:.4f} | CE Loss: {ce_loss_value:.4f} | Total Loss: {loss:.4f} | BCE_Acc: {bce_acc:.4f} | CE_Acc: {ce_acc:.4f}")
+        print(f"[UPDATE TEST SET] [EPOCH {epoch + 1}] BCE Loss: {bce_loss_value:.4f} | CE Loss: {ce_loss_value:.4f} | Total Loss: {loss:.4f} | BCE_Acc: {bce_acc:.4f} | CE_Acc: {ce_acc:.4f}")
 
 features_dfs = [pd.DataFrame(tensor.numpy()) for tensor in features_list]
-targets_dfs = [pd.DataFrame(tensor.numpy()) for tensor in targets_list]
+targets_dfs = [pd.DataFrame(tensor.cpu().detach().numpy()) for tensor in targets_list]
 
 features_df = pd.concat(features_dfs, ignore_index=True)
 targets_df = pd.concat(targets_dfs, ignore_index=True)
