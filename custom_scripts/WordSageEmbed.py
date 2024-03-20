@@ -88,7 +88,7 @@ class WordSAGE(torch.nn.Module):
         targets_encoded_test = pd.Series(label_encoder.transform(y_values_test))
 
         genemarkers = GeneMarkers()
-        full_list_train, full_list_test = genemarkers.ConstructTargets()
+        full_list_train, full_list_test, _ = genemarkers.ConstructTargets(y_values_train, y_values_test, normalized_train, normalized_test)
 
         inputs_train, bce_targets_train_list, targets_train_list = self.mix_data(seed, tissue_train, full_list_train, targets_encoded_train)
         inputs_test, bce_targets_test_list, targets_test_list = self.mix_data(seed, tissue_test, full_list_test, targets_encoded_test)

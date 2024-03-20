@@ -1,26 +1,27 @@
-import torch
-
 import numpy as np
 import pandas as pd
 import scanpy as sc
 
-import random
-
 import sys
 import os
-
-from data_pre import data_pre
 
 class GeneMarkers():
     def __init__(self):
         super(GeneMarkers, self).__init__()
 
-    def FindGeneMarkers(self):
-        data = data_pre()
-        _, _, genes, y_values_train, y_values_test, normalized_train, normalized_test = data.read_w2v()
+        current_script_path = __file__
+        current_dir = os.path.dirname(current_script_path)
+        parent_dir = os.path.dirname(current_dir)
+        sys.path.append(parent_dir)
+        parent_parent = os.path.dirname(parent_dir)
+        parent_parent = parent_parent.replace("\\", "/")
+        data_dir_ = parent_parent+'/dance_data'
+        self.path = data_dir_
 
-        obs_train = pd.DataFrame({'condition': y_values_train[0]})
-        obs_test = pd.DataFrame({'condition': y_values_test[0]})
+    def FindGeneMarkers(self, y_values_train, y_values_test, normalized_train, normalized_test):
+
+        obs_train = pd.DataFrame({'condition': y_values_train})
+        obs_test = pd.DataFrame({'condition': y_values_test})
 
         adata1 = sc.AnnData(X=normalized_train.T.reset_index(drop=True), obs=obs_train)
         adata2 = sc.AnnData(X=normalized_test.T.reset_index(drop=True), obs=obs_test)
@@ -42,10 +43,10 @@ class GeneMarkers():
             df = df.sort_values('pvals', ascending=True)
             dfs[group] = df
 
-        return dfs, y_values_train, y_values_test
+        return dfs
 
-    def ConstructTargets(self):
-        dfs, y_values_train, y_values_test = self.FindGeneMarkers()
+    def ConstructTargets(self, y_values_train, y_values_test, normalized_train, normalized_test):
+        dfs = self.FindGeneMarkers(y_values_train, y_values_test, normalized_train, normalized_test)
         sublist_length = 10
 
         all_names = []
@@ -101,18 +102,18 @@ class GeneMarkers():
             targets[group] = target
 
         ft_y_train = []
-        for target in y_values_train[0]:
+        for target in y_values_train:
             new_target = targets[target]
             ft_y_train.append(new_target)
 
         ft_y_train = pd.DataFrame(ft_y_train)
 
         ft_y_test = []
-        for target in y_values_test[0]:
+        for target in y_values_test:
             new_target = targets[target]
             ft_y_test.append(new_target)
 
         ft_y_test= pd.DataFrame(ft_y_test)
 
         print('\nTargets Constructed.\n')
-        return ft_y_train, ft_y_test
+        return ft_y_train, ft_y_test, dfs

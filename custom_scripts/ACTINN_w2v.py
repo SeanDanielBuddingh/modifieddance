@@ -1,41 +1,20 @@
 import torch
 import torch.nn.functional as F
 import numpy as np
-from torch_geometric.nn import SAGEConv
-import networkx as nx
-from data_pre  import data_pre
-from sklearn.model_selection import train_test_split
-from sklearn.preprocessing import LabelEncoder
-from sklearn.metrics import roc_auc_score, f1_score, precision_score, recall_score, confusion_matrix
-from torch_geometric.data import Data
-from sklearn.metrics import accuracy_score
-import gc
-from scipy.sparse import csr_matrix
-import dgl
-import copy
-
-from torcheval.metrics import MulticlassAUROC
-
-#ScDeepSort Imports
-from dance.modules.single_modality.cell_type_annotation.scdeepsort import ScDeepSort
-from dance.utils import set_seed
 
 import os
 os.environ["DGLBACKEND"] = "pytorch"
-from pprint import pprint
-from dance.datasets.singlemodality import ScDeepSortDataset
 
-import scanpy as sc
-from dance.transforms import AnnDataTransform, FilterGenesPercentile
-from dance.transforms import Compose, SetConfig
-from dance.transforms.graph import PCACellFeatureGraph, CellFeatureGraph
-from dance.typing import LogLevel, Optional
+import sys
+sys.path.append("..")
 
-#ACTINN
 from dance.modules.single_modality.cell_type_annotation.actinn import ACTINN
 
-#Celltypist
-from dance.modules.single_modality.cell_type_annotation.celltypist import Celltypist
+from dance.utils import set_seed
+
+from sklearn.metrics import accuracy_score, f1_score, precision_score, recall_score, confusion_matrix
+
+from torcheval.metrics import MulticlassAUROC
 
 from WordSageimport import WordSAGE
 
@@ -62,7 +41,6 @@ print(torch.cuda.is_available())
 print(torch.cuda.get_device_name(0))
 
 model = ACTINN(lambd=0.01, device='cuda')
-
 model.fit(train_inputs, train_targets, lr=0.001, num_epochs=300,
           batch_size=1000, print_cost=True)
 pred = model.predict(test_inputs)

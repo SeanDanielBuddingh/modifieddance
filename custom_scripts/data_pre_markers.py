@@ -10,10 +10,11 @@ import torch
 import numpy as np
 import pandas as pd
 from sklearn.model_selection import train_test_split
-from sklearn.decomposition import PCA
 
 from gensim.models import Word2Vec
 from transformers import BertTokenizer, BertModel
+
+from differential import GeneMarkers
 
 
 
@@ -33,18 +34,12 @@ class data_pre():
         
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
-        #brain_train, brain_test, brain_train_labels, brain_test_labels, corpus_train_brain, spleen_train, spleen_test, spleen_train_labels, spleen_test_labels, corpus_train_spleen, kidney_train, kidney_test, kidney_train_labels, kidney_test_labels, corpus_train_kidney = self.load_data()
+        brain_train, brain_test, brain_train_labels, brain_test_labels, corpus_train_brain, spleen_train, spleen_test, spleen_train_labels, spleen_test_labels, corpus_train_spleen, kidney_train, kidney_test, kidney_train_labels, kidney_test_labels, corpus_train_kidney = self.load_data()
         #pancreas_train, pancreas_test, pancreas_train_labels, pancreas_test_labels, corpus_train_pancreas, spleen_train, spleen_test, spleen_train_labels, spleen_test_labels, corpus_train_spleen, bonemarrow_train, bonemarrow_test, bonemarrow_train_labels, bonemarrow_test_labels, corpus_train_bonemarrow = self.load_human_data()
 
-        #self.get_w2v(brain_train, brain_test, brain_train_labels, brain_test_labels, corpus_train_brain, spleen_train, spleen_test, spleen_train_labels, spleen_test_labels, corpus_train_spleen, kidney_train, kidney_test, kidney_train_labels, kidney_test_labels, corpus_train_kidney)
+        self.get_w2v(brain_train, brain_test, brain_train_labels, brain_test_labels, corpus_train_brain, spleen_train, spleen_test, spleen_train_labels, spleen_test_labels, corpus_train_spleen, kidney_train, kidney_test, kidney_train_labels, kidney_test_labels, corpus_train_kidney)
         #self.get_w2v_human(pancreas_train, pancreas_test, pancreas_train_labels, pancreas_test_labels, corpus_train_pancreas, spleen_train, spleen_test, spleen_train_labels, spleen_test_labels, corpus_train_spleen, bonemarrow_train, bonemarrow_test, bonemarrow_train_labels, bonemarrow_test_labels, corpus_train_bonemarrow)
 
-        #self.bert_embed(brain_test, corpus_brain, brain_y)
-        #self.bert_embed(spleen_x, corpus_spleen, spleen_y)
-        #self.bert_embed(spleen_x, corpus_spleen, kidney_y)
-        #self.bert_embed(brain_train, corpus_btrain, btrain_y)
-        #self.bert_embed(s_train, corpus_strain, strain_y)
-        #self.bert_embed(k_train, corpus_ktrain, ktrain_y)
     def load_human_data(self):
         '''
         Human Pancreas
@@ -268,6 +263,9 @@ class data_pre():
         '''
         Mouse Pre-Processing
         '''
+
+        genemarkers = GeneMarkers()
+
         brain_train = pd.concat([pd.read_csv(self.path+'/train/mouse/mouse_Brain753_data.csv', header=0, index_col=0),
                              pd.read_csv(self.path+'/train/mouse/mouse_Brain3285_data.csv', header=0, index_col=0)],axis=1, ignore_index=False)
         brain_train_y = pd.concat([pd.read_csv(self.path+'/train/mouse/mouse_Brain753_celltype.csv')['Cell_type'],
@@ -303,14 +301,14 @@ class data_pre():
         brain_test = brain_test.T
 
         brain_train.to_csv(self.path+'/normalized_brain_train.csv', index=True, header=True)
-        brain_test.to_csv(self.path+'/normalized_brain_test.csv', index=True, header=True)      
+        brain_test.to_csv(self.path+'/normalized_brain_test.csv', index=True, header=True)     
+
+        _, _, genemarker_dfs = genemarkers.ConstructTargets(brain_train_labels, brain_test_labels, brain_train, brain_test) 
 
         corpus_train_brain = []
-        for c_name in brain_train.columns:
-            cell = brain_train[c_name]
-            sorted = cell[cell!=0].sort_values(ascending=False)
-            corpus_train_brain.append(sorted.index.tolist())
-
+        for _, df in genemarker_dfs.items():
+            genes_sorted = df['names'].tolist()
+            corpus_train_brain.append(genes_sorted)
         
         spleen_train = pd.read_csv(self.path+'/train/mouse/mouse_Spleen1970_data.csv', header=0, index_col=0)
         spleen_train_y = pd.read_csv(self.path+'/train/mouse/mouse_Spleen1970_celltype.csv')['Cell_type'].reset_index(drop=True)
@@ -348,11 +346,12 @@ class data_pre():
         spleen_train.to_csv(self.path+'/normalized_spleen_train.csv', index=True, header=True)
         spleen_test.to_csv(self.path+'/normalized_spleen_test.csv', index=True, header=True)      
 
+        _, _, genemarker_dfs = genemarkers.ConstructTargets(spleen_train_labels, spleen_test_labels, spleen_train, spleen_test) 
+
         corpus_train_spleen = []
-        for c_name in spleen_train.columns:
-            cell = spleen_train[c_name]
-            sorted = cell[cell!=0].sort_values(ascending=False)
-            corpus_train_spleen.append(sorted.index.tolist())
+        for _, df in genemarker_dfs.items():
+            genes_sorted = df['names'].tolist()
+            corpus_train_spleen.append(genes_sorted)
 
         kidney_train = pd.read_csv(self.path+'/train/mouse/mouse_Kidney4682_data.csv', header=0, index_col=0).fillna(0)
         kidney_train_y = pd.read_csv(self.path+'/train/mouse/mouse_Kidney4682_celltype.csv')['Cell_type'].reset_index(drop=True)
@@ -389,11 +388,12 @@ class data_pre():
         kidney_train.to_csv(self.path+'/normalized_kidney_train.csv', index=True, header=True)
         kidney_test.to_csv(self.path+'/normalized_kidney_test.csv', index=True, header=True)      
 
+        _, _, genemarker_dfs = genemarkers.ConstructTargets(kidney_train_labels, kidney_test_labels, kidney_train, kidney_test) 
+
         corpus_train_kidney = []
-        for c_name in kidney_train.columns:
-            cell = kidney_train[c_name]
-            sorted = cell[cell!=0].sort_values(ascending=False)
-            corpus_train_kidney.append(sorted.index.tolist())
+        for _, df in genemarker_dfs.items():
+            genes_sorted = df['names'].tolist()
+            corpus_train_kidney.append(genes_sorted)
         
         print('loaded')
         
@@ -409,7 +409,7 @@ class data_pre():
                 b_matrix[i] = b_w2v[gene]
             except KeyError:
                 b_matrix[i] = np.zeros(b_w2v.vector_size)
-        #print(b_matrix.shape)
+
         b_cells = brain_train.T.values @ b_matrix
         b_cells = pd.DataFrame(b_cells)
         b_cells.to_csv(self.path+'/brain_train.csv', index=False, header=False)
@@ -581,4 +581,4 @@ class data_pre():
 
         print(outputs)
         return outputs
-#data = data_pre()
+data = data_pre()
