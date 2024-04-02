@@ -19,12 +19,12 @@ class GeneMarkers():
         self.path = data_dir_
 
     def FindGeneMarkers(self, y_values_train, y_values_test, normalized_train, normalized_test):
-
+        
         obs_train = pd.DataFrame({'condition': y_values_train})
         obs_test = pd.DataFrame({'condition': y_values_test})
 
-        adata1 = sc.AnnData(X=normalized_train.T.reset_index(drop=True), obs=obs_train)
-        adata2 = sc.AnnData(X=normalized_test.T.reset_index(drop=True), obs=obs_test)
+        adata1 = sc.AnnData(X=normalized_train, obs=obs_train)
+        adata2 = sc.AnnData(X=normalized_test, obs=obs_test)
         adata = sc.concat([adata1, adata2], join="outer")
 
         sc.tl.rank_genes_groups(adata, groupby='condition', method='t-test')

@@ -88,7 +88,7 @@ class WordSAGE(torch.nn.Module):
         targets_encoded_test = pd.Series(label_encoder.transform(y_values_test))
 
         genemarkers = GeneMarkers()
-        full_list_train, full_list_test, _ = genemarkers.ConstructTargets(y_values_train, y_values_test, normalized_train, normalized_test)
+        full_list_train, full_list_test, _ = genemarkers.ConstructTargets(y_values_train[0], y_values_test[0], normalized_train, normalized_test)
 
         inputs_train, bce_targets_train_list, targets_train_list = self.mix_data(seed, tissue_train, full_list_train, targets_encoded_train)
         inputs_test, bce_targets_test_list, targets_test_list = self.mix_data(seed, tissue_test, full_list_test, targets_encoded_test)
@@ -152,7 +152,7 @@ class WordSAGE(torch.nn.Module):
         return G, num_train_nodes
 
     def mix_data(self, seed, inputs, bce_targets, ce_targets):
-        batch_size = 128
+        batch_size = 32
         np.random.seed(seed)
         print('Mixing Data\n')
         # Combine inputs and targets
@@ -207,12 +207,16 @@ class WordSAGE(torch.nn.Module):
         return batches
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+print(device)
 seed = 42
-set_seed(42)
 in_channels = 2500
 hidden_channels = 2500
 out_channels = 2500
 num_classes = 16
+lr = 1e-2
+momentum = 0.9
+
+set_seed(seed)
 
 model = WordSAGE(in_channels, hidden_channels, out_channels, num_classes).to(device)
 
@@ -220,7 +224,7 @@ train_graphs, bce_targets_train_list, targets_train_list, test_graphs, bce_targe
 
 bce_loss = torch.nn.BCEWithLogitsLoss()
 ce_loss = torch.nn.CrossEntropyLoss()
-optimizer = torch.optim.SGD(model.parameters(), lr=0.01, momentum=0.9)
+optimizer = torch.optim.SGD(model.parameters(), lr=lr, momentum=momentum)
 
 for epoch in range(50):
     features_list = []
@@ -289,7 +293,7 @@ gc.collect()
 
 bce_loss = torch.nn.BCEWithLogitsLoss()
 ce_loss = torch.nn.CrossEntropyLoss()
-optimizer = torch.optim.SGD(model.parameters(), lr=0.01, momentum=0.9)
+optimizer = torch.optim.SGD(model.parameters(), lr=lr, momentum=momentum)
 
 for epoch in range(50):
     features_list = []
