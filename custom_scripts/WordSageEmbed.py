@@ -66,7 +66,14 @@ class WordSAGE(torch.nn.Module):
 
 def read_data(seed):
     data = data_pre()
-    tissue_train, tissue_test, genes, y_values_train, y_values_test, normalized_train, normalized_test = data.read_w2v()
+    tissue_train, tissue_test, genes, y_values_train, y_values_test, normalized_train, normalized_test, train_raw, test_raw = data.read_w2v()
+
+    # Raw Data Handling for comparison in the specific gene marker identification phase (in differential.py)
+    train_genes = set(train_raw.index)
+    test_genes = set(test_raw.index)
+    common_genes = train_genes.intersection(test_genes)
+    combined_brain = pd.concat([train_raw, test_raw], axis=1, ignore_index=False).fillna(0).loc[list(common_genes)]
+    combined_brain = combined_brain.T.reset_index(drop=True)
 
     normalized_train = normalized_train.T.reset_index(drop=True)
     normalized_test = normalized_test.T.reset_index(drop=True)
@@ -88,11 +95,11 @@ def read_data(seed):
     targets_encoded_test = pd.Series(label_encoder.transform(y_values_test[0]))
 
     genemarkers = GeneMarkers()
-    full_list_train, full_list_test, _ = genemarkers.ConstructTargets(y_values_train[0], y_values_test[0], normalized_train, normalized_test)
+    full_list_train, full_list_test, _ = genemarkers.ConstructTargets(y_values_train[0], y_values_test[0], normalized_train, normalized_test, combined_brain)
 
     inputs_train, bce_targets_train_list, targets_train_list = mix_data(seed, tissue_train, full_list_train, targets_encoded_train)
     inputs_test, bce_targets_test_list, targets_test_list = mix_data(seed, tissue_test, full_list_test, targets_encoded_test)
-    
+
     train_graphs, train_nodes_list = [], []
     for batch in inputs_train:
         train_graph, train_nodes = basic_dgl_graph(batch, genes, normalized_train)
@@ -152,7 +159,7 @@ def basic_dgl_graph(train_inputs, genes, normalized):
     return G, num_train_nodes
 
 def mix_data(seed, inputs, bce_targets, ce_targets):
-    batch_size = 32
+    batch_size = 64
     np.random.seed(seed)
     print('\nMixing Data\n')
     # Combine inputs and targets
@@ -227,9 +234,11 @@ bce_loss = torch.nn.BCEWithLogitsLoss()
 ce_loss = torch.nn.CrossEntropyLoss()
 optimizer = torch.optim.SGD(model.parameters(), lr=lr, momentum=momentum)
 
-for epoch in range(50):
+for epoch in range(100):
     features_list = []
     targets_list = []
+    bce_targets_list = []
+    y_hat_list = []
     count=0
     correct_predictions = 0
     total_predictions = 0
@@ -274,6 +283,8 @@ for epoch in range(50):
         optimizer.step()
         features_list.append(feature.cpu().detach()[(range(train_nodes))])
         targets_list.append(train_targets)
+        bce_targets_list.append(bce_train_targets)
+        y_hat_list.append(bce_cells)
 
     bce_acc= count/bcc_denom
     if (epoch+1) % 1 == 0:
@@ -281,12 +292,18 @@ for epoch in range(50):
 
 features_dfs = [pd.DataFrame(tensor.numpy()) for tensor in features_list]
 targets_dfs = [pd.DataFrame(tensor.cpu().detach().numpy()) for tensor in targets_list]
+bce_targets_dfs = [pd.DataFrame(tensor.cpu().detach().squeeze(1).numpy()) for tensor in bce_targets_list]
+y_hat_dfs = [pd.DataFrame(tensor.cpu().detach().squeeze(1).numpy()) for tensor in y_hat_list]
 
 features_df = pd.concat(features_dfs, ignore_index=True)
 targets_df = pd.concat(targets_dfs, ignore_index=True)
+bce_targets_df = pd.concat(bce_targets_dfs, ignore_index=True)
+y_hat_df = pd.concat(y_hat_dfs, ignore_index=True)
 
 features_df.to_csv(data_dir_+"/tuned_brain_train.csv",index=False, header=False)
 targets_df.to_csv(data_dir_+"/tuned_brain_train_labels.csv", index=False, header='Cell_Type')
+bce_targets_df.to_csv(data_dir_+"/y_hard_train.csv", index=False, header=False)
+y_hat_df.to_csv(data_dir_+"/y_hat_train.csv", index=False, header=False)
 
 del bce_loss, ce_loss, optimizer
 torch.cuda.empty_cache() 
@@ -296,9 +313,11 @@ bce_loss = torch.nn.BCEWithLogitsLoss()
 ce_loss = torch.nn.CrossEntropyLoss()
 optimizer = torch.optim.SGD(model.parameters(), lr=lr, momentum=momentum)
 
-for epoch in range(50):
+for epoch in range(100):
     features_list = []
     targets_list = []
+    bce_targets_list = []
+    y_hat_list = []
     count=0
     correct_predictions = 0
     total_predictions = 0
@@ -343,6 +362,8 @@ for epoch in range(50):
         optimizer.step()
         features_list.append(feature.cpu().detach()[(range(test_nodes))])
         targets_list.append(test_targets)
+        bce_targets_list.append(bce_test_targets)
+        y_hat_list.append(bce_cells)
         
     bce_acc= count/bcc_denom
     if (epoch+1) % 1 == 0:
@@ -350,11 +371,17 @@ for epoch in range(50):
 
 features_dfs = [pd.DataFrame(tensor.numpy()) for tensor in features_list]
 targets_dfs = [pd.DataFrame(tensor.cpu().detach().numpy()) for tensor in targets_list]
+bce_targets_dfs = [pd.DataFrame(tensor.cpu().detach().squeeze(1).numpy()) for tensor in bce_targets_list]
+y_hat_dfs = [pd.DataFrame(tensor.cpu().detach().squeeze(1).numpy()) for tensor in y_hat_list]
 
 features_df = pd.concat(features_dfs, ignore_index=True)
 targets_df = pd.concat(targets_dfs, ignore_index=True)
+bce_targets_df = pd.concat(bce_targets_dfs, ignore_index=True)
+y_hat_df = pd.concat(y_hat_dfs, ignore_index=True)
 
 features_df.to_csv(data_dir_+"/tuned_brain_test.csv",index=False, header=False)
 targets_df.to_csv(data_dir_+"/tuned_brain_test_labels.csv", index=False, header='Cell_Type')
+bce_targets_df.to_csv(data_dir_+"/y_hard_test.csv", index=False, header=False)
+y_hat_df.to_csv(data_dir_+"/y_hat_test.csv", index=False, header=False)
 
 

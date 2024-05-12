@@ -556,7 +556,13 @@ class data_pre():
         normalized_train = pd.read_csv(self.path+'/normalized_brain_train.csv', header=0, index_col=0)
         normalized_test = pd.read_csv(self.path+'/normalized_brain_test.csv', header=0, index_col=0)
 
-        return tissue_train, tissue_test, genes, y_values_train, y_values_test, normalized_train, normalized_test
+        # raw inputs
+
+        brain_train = pd.concat([pd.read_csv(self.path+'/train/mouse/mouse_Brain753_data.csv', header=0, index_col=0),
+                             pd.read_csv(self.path+'/train/mouse/mouse_Brain3285_data.csv', header=0, index_col=0)],axis=1, ignore_index=False)
+        brain_test = pd.read_csv(self.path+'/test/mouse/mouse_Brain2695_data.csv', header=0, index_col=0)
+
+        return tissue_train, tissue_test, genes, y_values_train, y_values_test, normalized_train, normalized_test, brain_train, brain_test
     
     def w2v_embed(self, corpus):
         '''

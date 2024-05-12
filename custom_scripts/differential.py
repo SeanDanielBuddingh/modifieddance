@@ -109,7 +109,7 @@ class GeneMarkers():
 
         return dfs, df_group, cluster_conditions
 
-    def ConstructTargets(self, y_values_train, y_values_test, normalized_train, normalized_test):
+    def ConstructTargets(self, y_values_train, y_values_test, normalized_train, normalized_test, combined_brain):
         dfs, df_group, cluster_conditions = self.FindGeneMarkers(y_values_train, y_values_test, normalized_train, normalized_test)
         sublist_length = 10
 
@@ -123,34 +123,41 @@ class GeneMarkers():
 
             all_names.extend(selected_names)
 
-        #Checks for co-occuring genes -> replaces them with the next set of genes.
-        #Goal: Select Genes which do not co-occur, and are statistically significant. (Specific Gene Markers)
-        
+        # Checks for co-occuring genes -> replaces them with the next set of genes.
+        # Goal: Select Genes which do not co-occur, and are statistically significant. (Specific Gene Markers)
+        # Instead of checking the list of top 10 genes, we will check directly against the unnormalized data.
+        y_all = pd.concat([y_values_train, y_values_test], axis=0)
+        y_all = y_all.reset_index(drop=True)
+
         replacement_counters = {group: 0 for group in dfs.keys()}
-        while True:
+        Flag = False
+        while not Flag:
             co_occurring_indices = {}
             for name in set(all_names):
+                raw_data_indices = combined_brain.loc[combined_brain[name] > 0].index
+                labels_with_gene = y_all[raw_data_indices]
+                unique_labels = labels_with_gene.unique()
+                
+                if len(unique_labels) > 1:
+                    group = unique_labels[0]
+
                 indices = [i for i, x in enumerate(all_names) if x == name]
                 if len(indices) > 1:
                     co_occurring_indices[name] = indices
 
+                    replacement_name = dfs[group]['names'].iloc[sublist_length + replacement_counters[group]]
+
+                    # Check the p-value of the replacement name
+                    replacement_pval = dfs[group]['pvals'].iloc[sublist_length + replacement_counters[group]]
+                    if replacement_pval > 0.05:
+                        raise ValueError("The p-value for the replacement name is greater than 0.05.")
+
+                    replacement_counters[group] += 1
+
+                    all_names[co_occurring_indices[name][0]] = replacement_name
+            
             if not co_occurring_indices:
-                break
-
-            for name, indices in co_occurring_indices.items():
-                group_idx = indices[0] // sublist_length
-                group = list(dfs.keys())[group_idx]
-
-                replacement_name = dfs[group]['names'].iloc[sublist_length + replacement_counters[group]]
-
-                # Check the p-value of the replacement name
-                replacement_pval = dfs[group]['pvals'].iloc[sublist_length + replacement_counters[group]]
-                if replacement_pval > 0.05:
-                    raise ValueError("The p-value for the replacement name is greater than 0.05.")
-
-                replacement_counters[group] += 1
-
-                all_names[indices[0]] = replacement_name
+                Flag = True
  
         group_names = [all_names[i:i+sublist_length] for i in range(0, len(all_names), sublist_length)]
         group_names_df = pd.DataFrame(group_names).T
