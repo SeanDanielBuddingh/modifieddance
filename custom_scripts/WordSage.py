@@ -1,47 +1,27 @@
 import os
 import sys
+
+os.environ["DGLBACKEND"] = "pytorch"
+
 current_script_path = __file__
 current_dir = os.path.dirname(current_script_path)
 parent_dir = os.path.dirname(current_dir)
 sys.path.append(parent_dir)
+
 import torch
 import torch.nn.functional as F
 import numpy as np
-from dgl.nn import SAGEConv
-import networkx as nx
-from data_pre  import data_pre
-from sklearn.model_selection import train_test_split
-from sklearn.metrics import roc_auc_score, f1_score, precision_score, recall_score, confusion_matrix
-from sklearn.preprocessing import LabelEncoder
-from torch_geometric.data import Data
-from sklearn.metrics import accuracy_score
 import gc
-from scipy.sparse import csr_matrix
 import dgl
-import copy
 import pandas as pd
-from torch.utils.data import DataLoader
+
+from dgl.nn import SAGEConv
+from data_pre  import data_pre
+from sklearn.metrics import f1_score, precision_score, recall_score, confusion_matrix
+from sklearn.preprocessing import LabelEncoder
+from sklearn.metrics import accuracy_score
 from torcheval.metrics import MulticlassAUROC
-
-#ScDeepSort Imports
-from dance.modules.single_modality.cell_type_annotation.scdeepsort import ScDeepSort
 from dance.utils import set_seed
-
-os.environ["DGLBACKEND"] = "pytorch"
-from pprint import pprint
-from dance.datasets.singlemodality import ScDeepSortDataset
-
-import scanpy as sc
-from dance.transforms import AnnDataTransform, FilterGenesPercentile
-from dance.transforms import Compose, SetConfig
-from dance.transforms.graph import PCACellFeatureGraph, CellFeatureGraph
-from dance.typing import LogLevel, Optional
-
-#ACTINN
-from dance.modules.single_modality.cell_type_annotation.actinn import ACTINN
-
-#Celltypist
-from dance.modules.single_modality.cell_type_annotation.celltypist import Celltypist
 
 class WordSAGE(torch.nn.Module):
     def __init__(self, in_channels, hidden_channels, out_channels, num_classes):
@@ -65,7 +45,7 @@ class WordSAGE(torch.nn.Module):
 
     def read_data(self, seed):
         data = data_pre()
-        tissue_train, tissue_test, genes, y_values_train, y_values_test, normalized_train, normalized_test = data.read_w2v()
+        tissue_train, tissue_test, genes, y_values_train, y_values_test, normalized_train, normalized_test, _, _ = data.read_w2v()
 
         normalized_train = normalized_train.T.reset_index(drop=True)
         normalized_test = normalized_test.T.reset_index(drop=True)
@@ -153,64 +133,64 @@ class WordSAGE(torch.nn.Module):
         return inputs_shuffled, targets_shuffled
 
 
-device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-seed = 42
-set_seed(42)
-in_channels = 2500
-hidden_channels = 2500
-out_channels = 2500
-num_classes = 16
-model = WordSAGE(in_channels, hidden_channels, out_channels, num_classes).to(device)
-train_graph, train_targets, test_graph, test_targets, train_nodes, test_nodes = WordSAGE.read_data(self=model, seed=seed)
+# device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+# seed = 42
+# set_seed(42)
+# in_channels = 2500
+# hidden_channels = 2500
+# out_channels = 2500
+# num_classes = 16
+# model = WordSAGE(in_channels, hidden_channels, out_channels, num_classes).to(device)
+# train_graph, train_targets, test_graph, test_targets, train_nodes, test_nodes = WordSAGE.read_data(self=model, seed=seed)
 
-train_targets = torch.tensor(train_targets[0].values, dtype=torch.long).to(device)
-test_targets = torch.tensor(test_targets[0].values, dtype=torch.long).to(device)
+# train_targets = torch.tensor(train_targets[0].values, dtype=torch.long).to(device)
+# test_targets = torch.tensor(test_targets[0].values, dtype=torch.long).to(device)
 
-criterion = torch.nn.CrossEntropyLoss()
-optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
+# criterion = torch.nn.CrossEntropyLoss()
+# optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
 
-train_input_nodes = [i for i in range(train_graph.number_of_nodes()) if i < train_nodes]
-test_input_nodes = [i for i in range(test_graph.number_of_nodes()) if i < test_nodes]
+# train_input_nodes = [i for i in range(train_graph.number_of_nodes()) if i < train_nodes]
+# test_input_nodes = [i for i in range(test_graph.number_of_nodes()) if i < test_nodes]
 
-train_graph = train_graph.to(device)
-test_graph = test_graph.to(device)
-train_input_nodes = torch.as_tensor(train_input_nodes, dtype=torch.long).to(device)
-test_input_nodes = torch.as_tensor(test_input_nodes, dtype=torch.long).to(device)
+# train_graph = train_graph.to(device)
+# test_graph = test_graph.to(device)
+# train_input_nodes = torch.as_tensor(train_input_nodes, dtype=torch.long).to(device)
+# test_input_nodes = torch.as_tensor(test_input_nodes, dtype=torch.long).to(device)
 
-for epoch in range(300):
-    model.train()
-    optimizer.zero_grad()
-    out = model(train_graph, train_graph.ndata['features'])
-    loss = criterion(out[(range(train_nodes))], train_targets)
-    loss.backward()
-    optimizer.step()
+# for epoch in range(300):
+#     model.train()
+#     optimizer.zero_grad()
+#     out = model(train_graph, train_graph.ndata['features'])
+#     loss = criterion(out[(range(train_nodes))], train_targets)
+#     loss.backward()
+#     optimizer.step()
 
 
-model.eval()
-with torch.no_grad():
-    prob = model(test_graph, test_graph.ndata['features'])
-    test_loss = criterion(prob[(range(test_nodes))], test_targets)
+# model.eval()
+# with torch.no_grad():
+#     prob = model(test_graph, test_graph.ndata['features'])
+#     test_loss = criterion(prob[(range(test_nodes))], test_targets)
 
-    test_out = F.softmax(prob[(range(test_nodes))])
-    pred = torch.argmax(test_out, 1)
+#     test_out = F.softmax(prob[(range(test_nodes))])
+#     pred = torch.argmax(test_out, 1)
 
-    acc = accuracy_score(test_targets.cpu(), pred.cpu())
+#     acc = accuracy_score(test_targets.cpu(), pred.cpu())
     
-    auc = MulticlassAUROC(num_classes=num_classes)
-    auc.update(prob[(range(test_nodes))].cpu(), test_targets.cpu())
-    f1 = f1_score(test_targets.cpu(), pred.cpu(), average='macro')
-    precision = precision_score(test_targets.cpu(), pred.cpu(), average='macro')
-    recall = recall_score(test_targets.cpu(), pred.cpu(), average='macro')
+#     auc = MulticlassAUROC(num_classes=num_classes)
+#     auc.update(prob[(range(test_nodes))].cpu(), test_targets.cpu())
+#     f1 = f1_score(test_targets.cpu(), pred.cpu(), average='macro')
+#     precision = precision_score(test_targets.cpu(), pred.cpu(), average='macro')
+#     recall = recall_score(test_targets.cpu(), pred.cpu(), average='macro')
 
-    # For specificity, calculate the confusion matrix and derive specificity
-    cm = confusion_matrix(test_targets.cpu(), pred.cpu())
-    specificity = np.sum(np.diag(cm)) / np.sum(cm)
+#     # For specificity, calculate the confusion matrix and derive specificity
+#     cm = confusion_matrix(test_targets.cpu(), pred.cpu())
+#     specificity = np.sum(np.diag(cm)) / np.sum(cm)
 
-    print(f"ACC: {acc}")
-    print(f"Macro AUC: {auc.compute()}")
-    print(f"F1: {f1}")
-    print(f"Precision: {precision}")
-    print(f"Recall: {recall}")
-    print(f"Specificity: {specificity}")
+#     print(f"ACC: {acc}")
+#     print(f"Macro AUC: {auc.compute()}")
+#     print(f"F1: {f1}")
+#     print(f"Precision: {precision}")
+#     print(f"Recall: {recall}")
+#     print(f"Specificity: {specificity}")
 
 
