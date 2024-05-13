@@ -1,12 +1,21 @@
-import torch
-import torch.nn.functional as F
-import numpy as np
-
 import os
 os.environ["DGLBACKEND"] = "pytorch"
 
 import sys
 sys.path.append("..")
+
+current_script_path = __file__
+current_dir = os.path.dirname(current_script_path)
+parent_dir = os.path.dirname(current_dir)
+sys.path.append(parent_dir)
+parent_parent = os.path.dirname(parent_dir)
+parent_parent = parent_parent.replace("\\", "/")
+data_dir_ = parent_parent+'/dance_data'
+
+import torch
+import torch.nn.functional as F
+import numpy as np
+import pandas as pd
 
 from dance.modules.single_modality.cell_type_annotation.actinn import ACTINN
 
@@ -27,7 +36,13 @@ out_channels = 100
 num_classes = 16
 model = WordSAGE(in_channels, hidden_channels, out_channels, num_classes).to(device)
 train_inputs, test_inputs, train_targets, test_targets = WordSAGE.read_data(self=model, seed=seed)
-#print(train_inputs)
+
+# concatenating either y_hat_markers or y_hard_markers to the input data
+additional_vars = pd.read_csv(data_dir_+"/y_hard_train.csv", header=None)
+train_inputs = pd.concat([train_inputs, additional_vars], axis=1)
+additional_vars = pd.read_csv(data_dir_+"/y_hard_test.csv", header=None)
+test_inputs = pd.concat([test_inputs, additional_vars], axis=1)
+
 train_targets = torch.tensor(train_targets[0].values, dtype=torch.long).to(device)
 test_targets = torch.tensor(test_targets[0].values, dtype=torch.long).to(device)
 print(test_targets)
