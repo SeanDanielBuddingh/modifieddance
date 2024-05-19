@@ -12,6 +12,14 @@ import torch
 import sys
 import os
 
+current_script_path = __file__
+current_dir = os.path.dirname(current_script_path)
+parent_dir = os.path.dirname(current_dir)
+sys.path.append(parent_dir)
+parent_parent = os.path.dirname(parent_dir)
+parent_parent = parent_parent.replace("\\", "/")
+data_dir_ = parent_parent+'/dance_data'
+
 class GeneMarkers():
     def __init__(self):
         super(GeneMarkers, self).__init__()
@@ -109,9 +117,9 @@ class GeneMarkers():
 
         return dfs, df_group, cluster_conditions
 
-    def ConstructTargets(self, y_values_train, y_values_test, normalized_train, normalized_test, combined_brain):
+    def ConstructTargets(self, y_values_train, y_values_test, normalized_train, normalized_test, combined_brain, sublist_length):
         dfs, df_group, cluster_conditions = self.FindGeneMarkers(y_values_train, y_values_test, normalized_train, normalized_test)
-        sublist_length = 10
+        #sublist_length = 10
 
         all_names = []
         for group, df in dfs.items():
@@ -129,6 +137,7 @@ class GeneMarkers():
         y_all = pd.concat([y_values_train, y_values_test], axis=0)
         y_all = y_all.reset_index(drop=True)
 
+        print('\nChecking for co-occurring genes.\n')
         replacement_counters = {group: 0 for group in dfs.keys()}
         Flag = False
         while not Flag:
@@ -153,12 +162,12 @@ class GeneMarkers():
                         raise ValueError("The p-value for the replacement name is greater than 0.05.")
 
                     replacement_counters[group] += 1
-
                     all_names[co_occurring_indices[name][0]] = replacement_name
             
             if not co_occurring_indices:
                 Flag = True
- 
+        print('\nCo-occurring genes have been replaced.\n')
+
         group_names = [all_names[i:i+sublist_length] for i in range(0, len(all_names), sublist_length)]
         group_names_df = pd.DataFrame(group_names).T
 
@@ -199,4 +208,8 @@ class GeneMarkers():
         ft_y_test= pd.DataFrame(ft_y_test)
 
         print('\nTargets Constructed.\n')
+
+        ft_y_train.to_csv(data_dir_+'/ft_y_train.csv', header=None, index=None)
+        ft_y_test.to_csv(data_dir_+'/ft_y_test.csv', header=None, index=None)
+
         return ft_y_train, ft_y_test, dfs

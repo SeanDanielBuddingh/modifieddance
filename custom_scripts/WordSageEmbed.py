@@ -29,40 +29,85 @@ from dance.utils import set_seed
 
 
 class WordSAGE(torch.nn.Module):
-    def __init__(self, in_channels, hidden_channels, out_channels, num_classes, num_binary_targets):
+    def __init__(self, dim_tuple, hidden_channels, out_channels, num_classes, num_binary_targets):
         super(WordSAGE, self).__init__()
         self.seed = 42
+        src_dim, dst_dim = dim_tuple
+        self.dst_dim = dst_dim
+
+        # Block 1
         self.self_attention = torch.nn.MultiheadAttention(hidden_channels, num_heads=1)
-        self.conv1 = SAGEConv(in_channels, hidden_channels, aggregator_type='mean')
+        self.conv1 = dgl.nn.HeteroGraphConv({
+            'connects': dgl.nn.SAGEConv((src_dim, dst_dim), hidden_channels, 'mean'),
+        }, aggregate='sum')
         self.bn1 = torch.nn.BatchNorm1d(hidden_channels)
         self.ln1 = torch.nn.LayerNorm(hidden_channels)
-        self.conv2 = SAGEConv(hidden_channels, out_channels, aggregator_type='mean')
+        self.conv2 = dgl.nn.HeteroGraphConv({
+            'connects': dgl.nn.SAGEConv(hidden_channels, out_channels, 'mean'),
+        }, aggregate='sum')
         self.bn2 = torch.nn.BatchNorm1d(out_channels)
 
         self.linear = torch.nn.Linear(out_channels, out_channels)
         self.bce = torch.nn.Linear(out_channels, num_binary_targets)
+
+        # Block 2
+        self.self_attention2 = torch.nn.MultiheadAttention(hidden_channels, num_heads=1)
+        self.conv3 = dgl.nn.HeteroGraphConv({
+            'connects': dgl.nn.SAGEConv((src_dim, self.dst_dim), hidden_channels, 'mean'),
+        }, aggregate='sum')
+        self.bn3 = torch.nn.BatchNorm1d(hidden_channels)
+        self.ln2 = torch.nn.LayerNorm(hidden_channels)
+        self.conv4 = dgl.nn.HeteroGraphConv({
+            'connects': dgl.nn.SAGEConv(hidden_channels, out_channels, 'mean'),
+        }, aggregate='sum')
+        self.bn4 = torch.nn.BatchNorm1d(out_channels)
+        self.linear2 = torch.nn.Linear(out_channels, out_channels)
         self.ce = torch.nn.Linear(out_channels, num_classes)
 
-    def forward(self, x, edge_index):
-        h = self.conv1(x, edge_index)
-        h = self.bn1(h)
-        h = F.leaky_relu(h)
-        h, weights = self.self_attention(h,h,h)
-        h = self.ln1(h)
-        h = F.leaky_relu(h)
-        h = F.dropout(h, p=0.2, training=self.training)
-        h = self.conv2(x, h)
-        h = self.bn2(h)
-        x = F.leaky_relu(h)
-        #decoder
-        h = self.linear(x)
-        h = F.relu(h)
+    def forward(self, x, features, block, y_hat=None):
 
-        b = self.bce(h)
+        if not block:
+            # Block 1
+            h = self.conv1(x, features)
+            h = {k: self.bn1(v) for k, v in h.items()}
+            h = {k: F.leaky_relu(v) for k, v in h.items()}
+            h = {k: self.self_attention(v,v,v) for k, v in h.items()}
+            h = {k: self.ln1(v[0]) for k, v in h.items()}
+            h = {k: F.leaky_relu(v) for k, v in h.items()}
+            h = {k: F.dropout(v, p=0.2, training=self.training) for k, v in h.items()}
+            h = self.conv2(x, {'gene_node': features['gene_node'], 'train_node': h['train_node']})
+            h = {k: self.bn2(v) for k, v in h.items()}
+            y_hat = F.leaky_relu(h['train_node'])
+            # Block 1 Decoder
+            h = self.linear(y_hat)
+            h = F.relu(h)
+            b = self.bce(h)
 
-        y = self.ce(h)
+            return y_hat, b
+        
+        else:
+            # Concatenate y_hat to the features
+            features['train_node'] = pd.concat([features['train_node'], y_hat['train_node']], axis=1)
+            self.dst_dim = len(features['train_node'].columns)
 
-        return x, b, y
+            # Block 2
+            h = self.conv3(x, features)
+            h = {k: self.bn3(v) for k, v in h.items()}
+            h = {k: F.leaky_relu(v) for k, v in h.items()}
+            h = {k: self.self_attention2(v,v,v) for k, v in h.items()}
+            h = {k: self.ln2(v[0]) for k, v in h.items()}
+            h = {k: F.leaky_relu(v) for k, v in h.items()}
+            h = {k: F.dropout(v, p=0.2, training=self.training) for k, v in h.items()}
+            h = self.conv4(x, {'gene_node': features['gene_node'], 'train_node': h['train_node']})
+            h = {k: self.bn4(v) for k, v in h.items()}
+            x_hat = F.leaky_relu(h['train_node'])
+            # Block 2 Decoder
+            h = self.linear2(x_hat)
+            h = F.relu(h)
+            y = self.ce(h)
+
+            return x_hat, y
+
 
 def read_data(seed):
     data = data_pre()
@@ -95,7 +140,11 @@ def read_data(seed):
     targets_encoded_test = pd.Series(label_encoder.transform(y_values_test[0]))
 
     genemarkers = GeneMarkers()
-    full_list_train, full_list_test, _ = genemarkers.ConstructTargets(y_values_train[0], y_values_test[0], normalized_train, normalized_test, combined_brain)
+    if not os.path.exists(data_dir_+"/ft_y_train.csv"):
+        full_list_train, full_list_test, _ = genemarkers.ConstructTargets(y_values_train[0], y_values_test[0], normalized_train, normalized_test, combined_brain, sublist_length=140)
+    else:
+        full_list_train = pd.read_csv(data_dir_+"/ft_y_train.csv", header=None, index_col=None)
+        full_list_test = pd.read_csv(data_dir_+"/ft_y_test.csv", header=None, index_col=None)
 
     inputs_train, bce_targets_train_list, targets_train_list = mix_data(seed, tissue_train, full_list_train, targets_encoded_train)
     inputs_test, bce_targets_test_list, targets_test_list = mix_data(seed, tissue_test, full_list_test, targets_encoded_test)
@@ -117,41 +166,34 @@ def read_data(seed):
 def basic_dgl_graph(train_inputs, genes, normalized):
     num_train_nodes = len(train_inputs)
     num_gene_nodes = len(genes)
-    G = dgl.DGLGraph()
-    
-    G.add_nodes(num_train_nodes + num_gene_nodes)
-
-    train_feature_dim = train_inputs.shape[1]
-    gene_feature_dim = genes.shape[1] 
-    max_feature_dim = max(train_feature_dim, gene_feature_dim)
-    G.ndata['features'] = torch.zeros((num_train_nodes + num_gene_nodes, max_feature_dim), dtype=torch.float)
-
-    train_features = torch.tensor(train_inputs.to_numpy(), dtype=torch.float32)
-    G.ndata['features'][:num_train_nodes] = train_features
-    
-    gene_features = torch.tensor(genes.to_numpy(), dtype=torch.float32)
-    G.ndata['features'][num_train_nodes:] = gene_features
-    
-    G.ndata['cell_id'] = torch.tensor(([-1] * num_train_nodes) + list(range(len(G.nodes())-num_train_nodes)))
 
     edge_src = []
     edge_dst = []
     edge_weights = []
-    
     for i, cell_name in enumerate(train_inputs.index):
         vector = normalized.iloc[cell_name,:]
-        cell_index = i
 
         for j, expression in enumerate(vector):
             if expression == 0:
                 continue
             else:
-                edge_src.append(cell_index)
-                edge_dst.append(num_train_nodes + j)
+                edge_dst.append(i)
+                edge_src.append(j)
                 edge_weights.append(expression)
+    graph_data = {
+        ('gene_node', 'connects', 'train_node'): (torch.tensor(edge_src), torch.tensor(edge_dst))
+    }
+    G = dgl.heterograph(graph_data, num_nodes_dict={'gene_node': num_gene_nodes, 'train_node': num_train_nodes})
+
+    train_features = torch.tensor(train_inputs.to_numpy(), dtype=torch.float32)
+    G.nodes['train_node'].data['features'] = train_features
+    gene_features = torch.tensor(genes.to_numpy(), dtype=torch.float32)
+    G.nodes['gene_node'].data['features'] = gene_features
     
-    G.add_edges(edge_src, edge_dst)
-    G.edata['weight'] = torch.tensor(edge_weights, dtype=torch.float).view(-1, 1)
+    G.nodes['train_node'].data['cell_id'] = torch.tensor([-1] * num_train_nodes)
+    G.nodes['gene_node'].data['cell_id'] = torch.tensor(list(range(num_gene_nodes)))
+
+    G.edges['connects'].data['weight'] = torch.tensor(edge_weights, dtype=torch.float).view(-1, 1)
 
     del normalized
     gc.collect()
@@ -159,7 +201,7 @@ def basic_dgl_graph(train_inputs, genes, normalized):
     return G, num_train_nodes
 
 def mix_data(seed, inputs, bce_targets, ce_targets):
-    batch_size = 64
+    batch_size = 512
     np.random.seed(seed)
     print('\nMixing Data\n')
     # Combine inputs and targets
@@ -167,8 +209,8 @@ def mix_data(seed, inputs, bce_targets, ce_targets):
     print(combined.shape)
     combined = pd.concat([combined, ce_targets], axis=1)
     print(combined.shape,'\n')
-    # Shuffle the combined DataFrame
-    combined_shuffled = combined.sample(frac=1).reset_index(drop=True)
+    # Shuffle the combined DataFrame - temporarily disabled
+    combined_shuffled = combined #combined.sample(frac=1).reset_index(drop=True)
 
     # Convert each row of targets to a single list
     bce_targets_shuffled = combined_shuffled.iloc[:, 2500:-1]
@@ -217,7 +259,8 @@ device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 print(device)
 seed = 42
 train_graphs, bce_targets_train_list, targets_train_list, test_graphs, bce_targets_test_list, targets_test_list, train_nodes_list, test_nodes_list = read_data(seed=seed)
-in_channels = 2500
+src_dim = train_graphs[0].nodes['gene_node'].data['features'].shape[1] 
+dst_dim = 2500
 hidden_channels = 2500
 out_channels = 2500
 num_classes = 16
@@ -228,160 +271,165 @@ momentum = 0.9
 
 set_seed(seed)
 
-model = WordSAGE(in_channels, hidden_channels, out_channels, num_classes, num_binary_targets).to(device)
+model = WordSAGE((src_dim, dst_dim), hidden_channels, out_channels, num_classes, num_binary_targets).to(device)
 
 bce_loss = torch.nn.BCEWithLogitsLoss()
 ce_loss = torch.nn.CrossEntropyLoss()
 optimizer = torch.optim.SGD(model.parameters(), lr=lr, momentum=momentum)
 
-for epoch in range(100):
-    features_list = []
-    targets_list = []
-    bce_targets_list = []
-    y_hat_list = []
-    count=0
-    correct_predictions = 0
-    total_predictions = 0
-    bcc_denom = 0
-    for train_graph, bce_targets_train, train_targets, train_nodes in zip(train_graphs, bce_targets_train_list, targets_train_list, train_nodes_list):
+y_hat_list = []
+for block in [False, True]:
+    for epoch in range(25):
+        features_list = []
+        targets_list = []
+        count=0
+        correct_predictions = 0
+        total_predictions = 0
+        bcc_denom = 0
+        for i, (train_graph, bce_targets_train, train_targets, train_nodes) in enumerate(zip(train_graphs, bce_targets_train_list, targets_train_list, train_nodes_list)):
 
-        train_targets = torch.tensor(train_targets.values, dtype=torch.long).to(device)
+            train_graph = train_graph.to(device)
+            train_features = train_graph.nodes['train_node'].data['features']
+            gene_features = train_graph.nodes['gene_node'].data['features']
+            train_feature_map = {'gene_node': gene_features, 'train_node': train_features}
 
-        bce_train_targets = torch.tensor(bce_targets_train.values.tolist()).to(device)
+            train_targets = torch.tensor(train_targets.values, dtype=torch.long).to(device)
+            bce_train_targets = torch.tensor(bce_targets_train.values.tolist()).to(device)
 
-        train_input_nodes = [i for i in range(train_graph.number_of_nodes()) if i < train_nodes]
+            optimizer.zero_grad()
+            if not block:
+                bce_feature, bce_cells = model(train_graph, train_feature_map, block)
+                bce_loss_value = bce_loss(bce_cells, bce_train_targets.squeeze(1))
+                loss = bce_loss_value
+                for feat_out, target_out in zip(bce_cells, bce_train_targets.squeeze(1)):
+                    for logit, correct in zip(feat_out, target_out):
+                        logit = torch.sigmoid(logit)
+                        if logit >= 0.5:
+                            logit = 1
+                        else:
+                            logit = 0
+                        if logit == correct:
+                            count+=1
+                bcc_denom += (len(target_out)*len(bce_cells))
+                bce_acc= count/bcc_denom
+                loss.backward()
+                optimizer.step()
+                if epoch == 99:
+                    y_hat_list.append(bce_cells)
+            else:
+                feature, out_cells = model(train_graph, train_feature_map, block, y_hat_list[i])
+                ce_loss_value = ce_loss(out_cells, train_targets.squeeze(1))
+                lose = ce_loss_value
+                for feat_out, target_out in zip(out_cells, train_targets.squeeze(1)):
+                    feat_out = F.softmax(feat_out, dim=0)
+                    feat_out = torch.argmax(feat_out)
+                    correct_predictions += (target_out.detach().cpu().numpy() == feat_out.detach().cpu().numpy())
+                    total_predictions += 1
+                ce_acc = correct_predictions / total_predictions
+                loss.backward()
+                optimizer.step()
+                features_list.append(feature.cpu().detach()[(range(train_nodes))])
+                targets_list.append(train_targets)
 
-        train_graph = train_graph.to(device)
-
-        train_input_nodes = torch.as_tensor(train_input_nodes, dtype=torch.long).to(device)
-
-        optimizer.zero_grad()
-        feature, bce, out = model(train_graph, train_graph.ndata['features'])
-
-        bce_cells = bce[(range(train_nodes))]
-        out_cells = out[(range(train_nodes))]
-        bce_loss_value = bce_loss(bce_cells, bce_train_targets.squeeze(1))
-        ce_loss_value = ce_loss(out_cells, train_targets.squeeze(1))
-        loss = ce_loss_value + ( 0.1 * bce_loss_value )
-        for feat_out, target_out in zip(bce_cells, bce_train_targets.squeeze(1)):
-            for logit, correct in zip(feat_out, target_out):
-                logit = torch.sigmoid(logit)
-                if logit >= 0.5:
-                    logit = 1
-                else:
-                    logit = 0
-                if logit == correct:
-                    count+=1
-        bcc_denom += (len(target_out)*len(out_cells))
-        for feat_out, target_out in zip(out_cells, train_targets.squeeze(1)):
-            feat_out = F.softmax(feat_out, dim=0)
-            feat_out = torch.argmax(feat_out)
-            correct_predictions += (target_out.detach().cpu().numpy() == feat_out.detach().cpu().numpy())
-            total_predictions += 1
-        ce_acc = correct_predictions / total_predictions
-        loss.backward()
-        optimizer.step()
-        features_list.append(feature.cpu().detach()[(range(train_nodes))])
-        targets_list.append(train_targets)
-        bce_targets_list.append(bce_train_targets)
-        y_hat_list.append(bce_cells)
-
-    bce_acc= count/bcc_denom
-    if (epoch+1) % 1 == 0:
-        print(f"\n[UPDATE TRAIN SET] [EPOCH {epoch + 1}] BCE Loss: {bce_loss_value:.4f} | CE Loss: {ce_loss_value:.4f} | Total Loss: {loss:.4f} | BCE_Acc: {bce_acc:.4f} | CE_Acc: {ce_acc:.4f}")
+        if not block:
+            if (epoch+1) % 1 == 0:
+                print(f"\n[UPDATE TRAIN SET BLOCK 1] [EPOCH {epoch + 1}] BCE Loss: {bce_loss_value:.4f} | BCE_Acc: {bce_acc:.4f}")
+        else:
+            if (epoch+1) % 1 == 0:
+                print(f"\n[UPDATE TRAIN SET BLOCK 2] [EPOCH {epoch + 1}] CE Loss: {ce_loss_value:.4f} | CE_Acc: {ce_acc:.4f}")
 
 features_dfs = [pd.DataFrame(tensor.numpy()) for tensor in features_list]
 targets_dfs = [pd.DataFrame(tensor.cpu().detach().numpy()) for tensor in targets_list]
-bce_targets_dfs = [pd.DataFrame(tensor.cpu().detach().squeeze(1).numpy()) for tensor in bce_targets_list]
 y_hat_dfs = [pd.DataFrame(tensor.cpu().detach().squeeze(1).numpy()) for tensor in y_hat_list]
 
 features_df = pd.concat(features_dfs, ignore_index=True)
 targets_df = pd.concat(targets_dfs, ignore_index=True)
-bce_targets_df = pd.concat(bce_targets_dfs, ignore_index=True)
 y_hat_df = pd.concat(y_hat_dfs, ignore_index=True)
 
 features_df.to_csv(data_dir_+"/tuned_brain_train.csv",index=False, header=False)
 targets_df.to_csv(data_dir_+"/tuned_brain_train_labels.csv", index=False, header='Cell_Type')
-bce_targets_df.to_csv(data_dir_+"/y_hard_train.csv", index=False, header=False)
 y_hat_df.to_csv(data_dir_+"/y_hat_train.csv", index=False, header=False)
 
-del bce_loss, ce_loss, optimizer
-torch.cuda.empty_cache() 
-gc.collect()
+# Keep Model Weights etc.
+# del bce_loss, ce_loss, optimizer
+# torch.cuda.empty_cache() 
+# gc.collect()
 
-bce_loss = torch.nn.BCEWithLogitsLoss()
-ce_loss = torch.nn.CrossEntropyLoss()
-optimizer = torch.optim.SGD(model.parameters(), lr=lr, momentum=momentum)
+# bce_loss = torch.nn.BCEWithLogitsLoss()
+# ce_loss = torch.nn.CrossEntropyLoss()
+# optimizer = torch.optim.SGD(model.parameters(), lr=lr, momentum=momentum)
 
-for epoch in range(100):
-    features_list = []
-    targets_list = []
-    bce_targets_list = []
-    y_hat_list = []
-    count=0
-    correct_predictions = 0
-    total_predictions = 0
-    bcc_denom = 0
-    for test_graph, bce_targets_test, test_targets, test_nodes in zip(test_graphs, bce_targets_test_list, targets_test_list, test_nodes_list):
+y_hat_list = []
+for block in [False, True]:
+    for epoch in range(25):
+        features_list = []
+        targets_list = []
+        count=0
+        correct_predictions = 0
+        total_predictions = 0
+        bcc_denom = 0
+        for i, (test_graph, bce_targets_test, test_targets, test_nodes) in enumerate(zip(test_graphs, bce_targets_test_list, targets_test_list, test_nodes_list)):
 
-        test_targets = torch.tensor(test_targets.values, dtype=torch.long).to(device)
+            test_graph = test_graph.to(device)
+            test_features = test_graph.nodes['train_node'].data['features']
+            gene_features = test_graph.nodes['gene_node'].data['features']
+            test_feature_map = {'gene_node': gene_features, 'train_node': test_features}
 
-        bce_test_targets = torch.tensor(bce_targets_test.values.tolist()).to(device)
+            test_targets = torch.tensor(test_targets.values, dtype=torch.long).to(device)
+            bce_test_targets = torch.tensor(bce_targets_train.values.tolist()).to(device)
 
-        test_input_nodes = [i for i in range(test_graph.number_of_nodes()) if i < test_nodes]
+            optimizer.zero_grad()
+            if not block:
+                bce_feature, bce_cells = model(test_graph, test_feature_map, block)
+                bce_loss_value = bce_loss(bce_cells, bce_test_targets.squeeze(1))
+                loss = bce_loss_value
+                for feat_out, target_out in zip(bce_cells, bce_test_targets.squeeze(1)):
+                    for logit, correct in zip(feat_out, target_out):
+                        logit = torch.sigmoid(logit)
+                        if logit >= 0.5:
+                            logit = 1
+                        else:
+                            logit = 0
+                        if logit == correct:
+                            count+=1
+                bcc_denom += (len(target_out)*len(bce_cells))
+                bce_acc= count/bcc_denom
+                loss.backward()
+                optimizer.step()
+                if epoch == 99:
+                    y_hat_list.append(bce_cells)
+            else:
+                feature, out_cells = model(test_graph, test_feature_map, block, y_hat_list[i])
+                ce_loss_value = ce_loss(out_cells, test_targets.squeeze(1))
+                lose = ce_loss_value
+                for feat_out, target_out in zip(out_cells, test_targets.squeeze(1)):
+                    feat_out = F.softmax(feat_out, dim=0)
+                    feat_out = torch.argmax(feat_out)
+                    correct_predictions += (target_out.detach().cpu().numpy() == feat_out.detach().cpu().numpy())
+                    total_predictions += 1
+                ce_acc = correct_predictions / total_predictions
+                loss.backward()
+                optimizer.step()
+                features_list.append(feature.cpu().detach()[(range(test_nodes))])
+                targets_list.append(test_targets)
 
-        test_graph = test_graph.to(device)
-
-        test_input_nodes = torch.as_tensor(test_input_nodes, dtype=torch.long).to(device)
-
-        optimizer.zero_grad()
-        feature, bce, out = model(test_graph, test_graph.ndata['features'])
-
-        bce_cells = bce[(range(test_nodes))]
-        out_cells = out[(range(test_nodes))]
-        bce_loss_value = bce_loss(bce_cells, bce_test_targets.squeeze(1))
-        ce_loss_value = ce_loss(out_cells, test_targets.squeeze(1))
-        loss = ce_loss_value + ( 0.1 * bce_loss_value )
-        for feat_out, target_out in zip(bce_cells, bce_test_targets.squeeze(1)):
-            for logit, correct in zip(feat_out, target_out):
-                logit = torch.sigmoid(logit)
-                if logit >= 0.5:
-                    logit = 1
-                else:
-                    logit = 0
-                if logit == correct:
-                    count+=1
-        bcc_denom += (len(target_out)*len(out_cells))
-        for feat_out, target_out in zip(out_cells, test_targets.squeeze(1)):
-            feat_out = F.softmax(feat_out, dim=0)
-            feat_out = torch.argmax(feat_out)
-            correct_predictions += (target_out.detach().cpu().numpy() == feat_out.detach().cpu().numpy())
-            total_predictions += 1
-        ce_acc = correct_predictions / total_predictions
-        loss.backward()
-        optimizer.step()
-        features_list.append(feature.cpu().detach()[(range(test_nodes))])
-        targets_list.append(test_targets)
-        bce_targets_list.append(bce_test_targets)
-        y_hat_list.append(bce_cells)
-        
-    bce_acc= count/bcc_denom
-    if (epoch+1) % 1 == 0:
-        print(f"[UPDATE TEST SET] [EPOCH {epoch + 1}] BCE Loss: {bce_loss_value:.4f} | CE Loss: {ce_loss_value:.4f} | Total Loss: {loss:.4f} | BCE_Acc: {bce_acc:.4f} | CE_Acc: {ce_acc:.4f}")
+        if not block:
+            if (epoch+1) % 1 == 0:
+                print(f"\n[UPDATE test SET BLOCK 1] [EPOCH {epoch + 1}] BCE Loss: {bce_loss_value:.4f} | BCE_Acc: {bce_acc:.4f}")
+        else:
+            if (epoch+1) % 1 == 0:
+                print(f"\n[UPDATE test SET BLOCK 2] [EPOCH {epoch + 1}] CE Loss: {ce_loss_value:.4f} | CE_Acc: {ce_acc:.4f}")
 
 features_dfs = [pd.DataFrame(tensor.numpy()) for tensor in features_list]
 targets_dfs = [pd.DataFrame(tensor.cpu().detach().numpy()) for tensor in targets_list]
-bce_targets_dfs = [pd.DataFrame(tensor.cpu().detach().squeeze(1).numpy()) for tensor in bce_targets_list]
 y_hat_dfs = [pd.DataFrame(tensor.cpu().detach().squeeze(1).numpy()) for tensor in y_hat_list]
 
 features_df = pd.concat(features_dfs, ignore_index=True)
 targets_df = pd.concat(targets_dfs, ignore_index=True)
-bce_targets_df = pd.concat(bce_targets_dfs, ignore_index=True)
 y_hat_df = pd.concat(y_hat_dfs, ignore_index=True)
 
 features_df.to_csv(data_dir_+"/tuned_brain_test.csv",index=False, header=False)
 targets_df.to_csv(data_dir_+"/tuned_brain_test_labels.csv", index=False, header='Cell_Type')
-bce_targets_df.to_csv(data_dir_+"/y_hard_test.csv", index=False, header=False)
 y_hat_df.to_csv(data_dir_+"/y_hat_test.csv", index=False, header=False)
 
 
