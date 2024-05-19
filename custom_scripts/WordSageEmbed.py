@@ -69,15 +69,17 @@ class WordSAGE(torch.nn.Module):
         if not block:
             # Block 1
             h = self.conv1(x, features)
-            h = {k: self.bn1(v) for k, v in h.items()}
-            h = {k: F.leaky_relu(v) for k, v in h.items()}
-            h = {k: self.self_attention(v,v,v) for k, v in h.items()}
-            h = {k: self.ln1(v[0]) for k, v in h.items()}
-            h = {k: F.leaky_relu(v) for k, v in h.items()}
-            h = {k: F.dropout(v, p=0.2, training=self.training) for k, v in h.items()}
-            h = self.conv2(x, {'gene_node': features['gene_node'], 'train_node': h['train_node']})
-            h = {k: self.bn2(v) for k, v in h.items()}
-            y_hat = F.leaky_relu(h['train_node'])
+            h = torch.cat([v for v in h.values()], dim=0)
+            h = self.bn1(h)
+            h = F.leaky_relu(h)
+            h, weights = self.self_attention(h,h,h)
+            h = self.ln1(h)
+            h = F.leaky_relu(h)
+            h = F.dropout(h, p=0.2, training=self.training)
+            h = self.conv2(x, {'gene_node': features['gene_node'], 'train_node': h})
+            h = torch.cat([v for v in h.values()], dim=0)
+            h = self.bn2(h)
+            y_hat = F.leaky_relu(h)
             # Block 1 Decoder
             h = self.linear(y_hat)
             h = F.relu(h)
@@ -90,19 +92,21 @@ class WordSAGE(torch.nn.Module):
             features['train_node'] = pd.concat([features['train_node'], y_hat['train_node']], axis=1)
             self.dst_dim = len(features['train_node'].columns)
 
-            # Block 2
+            # Block 1
             h = self.conv3(x, features)
-            h = {k: self.bn3(v) for k, v in h.items()}
-            h = {k: F.leaky_relu(v) for k, v in h.items()}
-            h = {k: self.self_attention2(v,v,v) for k, v in h.items()}
-            h = {k: self.ln2(v[0]) for k, v in h.items()}
-            h = {k: F.leaky_relu(v) for k, v in h.items()}
-            h = {k: F.dropout(v, p=0.2, training=self.training) for k, v in h.items()}
-            h = self.conv4(x, {'gene_node': features['gene_node'], 'train_node': h['train_node']})
-            h = {k: self.bn4(v) for k, v in h.items()}
-            x_hat = F.leaky_relu(h['train_node'])
-            # Block 2 Decoder
-            h = self.linear2(x_hat)
+            h = torch.cat([v for v in h.values()], dim=0)
+            h = self.bn3(h)
+            h = F.leaky_relu(h)
+            h, weights = self.self_attention2(h,h,h)
+            h = self.ln2(h)
+            h = F.leaky_relu(h)
+            h = F.dropout(h, p=0.2, training=self.training)
+            h = self.conv4(x, {'gene_node': features['gene_node'], 'train_node': h})
+            h = torch.cat([v for v in h.values()], dim=0)
+            h = self.bn4(h)
+            x_hat = F.leaky_relu(h)
+            # Block 1 Decoder
+            h = self.linear(x_hat)
             h = F.relu(h)
             y = self.ce(h)
 
