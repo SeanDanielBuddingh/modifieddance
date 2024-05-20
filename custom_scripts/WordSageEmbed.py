@@ -77,7 +77,7 @@ class WordSAGEBLOCK2(torch.nn.Module):
         super(WordSAGEBLOCK2, self).__init__()
         self.seed = 42
         src_dim, dst_dim = dim_tuple
-        self.dst_dim = dst_dim
+        self.dst_dim = 2675
 
         # Block 2
         self.self_attention2 = torch.nn.MultiheadAttention(hidden_channels, num_heads=1)
@@ -96,8 +96,8 @@ class WordSAGEBLOCK2(torch.nn.Module):
     def forward(self, x, features, y_hat):
 
         # Concatenate y_hat to the features
-        features['train_node'] = pd.concat([features['train_node'], y_hat], axis=1)
-        self.dst_dim = len(features['train_node'].columns)
+        features['train_node'] = torch.cat([features['train_node'], y_hat], dim=1)
+        self.dst_dim = len(features['train_node'][0])
 
         # Block 2
         h = self.conv3(x, features)
@@ -113,14 +113,14 @@ class WordSAGEBLOCK2(torch.nn.Module):
         h = self.bn4(h)
         x_hat = F.leaky_relu(h)
         # Block 2 Decoder
-        h = self.linear(x_hat)
+        h = self.linear2(x_hat)
         h = F.relu(h)
         y = self.ce(h)
 
         return x_hat, y
 
 
-def read_data(seed):
+def read_data(batch_size, seed):
     data = data_pre()
     tissue_train, tissue_test, genes, y_values_train, y_values_test, normalized_train, normalized_test, train_raw, test_raw = data.read_w2v()
 
@@ -152,13 +152,13 @@ def read_data(seed):
 
     genemarkers = GeneMarkers()
     if not os.path.exists(data_dir_+"/ft_y_train.csv"):
-        full_list_train, full_list_test, _ = genemarkers.ConstructTargets(y_values_train[0], y_values_test[0], normalized_train, normalized_test, combined_brain, sublist_length=150)
+        full_list_train, full_list_test, _ = genemarkers.ConstructTargets(y_values_train[0], y_values_test[0], normalized_train, normalized_test, combined_brain, sublist_length=10)
     else:
         full_list_train = pd.read_csv(data_dir_+"/ft_y_train.csv", header=None, index_col=None)
         full_list_test = pd.read_csv(data_dir_+"/ft_y_test.csv", header=None, index_col=None)
 
-    inputs_train, bce_targets_train_list, targets_train_list = mix_data(seed, tissue_train, full_list_train, targets_encoded_train)
-    inputs_test, bce_targets_test_list, targets_test_list = mix_data(seed, tissue_test, full_list_test, targets_encoded_test)
+    inputs_train, bce_targets_train_list, targets_train_list = mix_data(seed, tissue_train, full_list_train, targets_encoded_train, batch_size)
+    inputs_test, bce_targets_test_list, targets_test_list = mix_data(seed, tissue_test, full_list_test, targets_encoded_test, batch_size)
 
     train_graphs, train_nodes_list = [], []
     for batch in inputs_train:
@@ -211,8 +211,8 @@ def basic_dgl_graph(train_inputs, genes, normalized):
 
     return G, num_train_nodes
 
-def mix_data(seed, inputs, bce_targets, ce_targets):
-    batch_size = 32
+def mix_data(seed, inputs, bce_targets, ce_targets, batch_size):
+
     np.random.seed(seed)
     print('\nMixing Data\n')
     # Combine inputs and targets
@@ -269,7 +269,8 @@ def batch_data(data, batch_size):
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 print(device)
 seed = 42
-train_graphs, bce_targets_train_list, targets_train_list, test_graphs, bce_targets_test_list, targets_test_list, train_nodes_list, test_nodes_list = read_data(seed=seed)
+batch_size = 32
+train_graphs, bce_targets_train_list, targets_train_list, test_graphs, bce_targets_test_list, targets_test_list, train_nodes_list, test_nodes_list = read_data(batch_size, seed=seed)
 src_dim = train_graphs[0].nodes['gene_node'].data['features'].shape[1] 
 dst_dim = 2500
 hidden_channels = 2500
@@ -289,46 +290,62 @@ bce_loss = torch.nn.BCEWithLogitsLoss()
 ce_loss = torch.nn.CrossEntropyLoss()
 optimizer = torch.optim.SGD(block1.parameters(), lr=lr, momentum=momentum)
 
-y_hat_list = []
-for epoch in range(50):
-    features_list = []
-    targets_list = []
-    count=0
-    bcc_denom = 0
-    for i, (train_graph, bce_targets_train, train_targets, train_nodes) in enumerate(zip(train_graphs, bce_targets_train_list, targets_train_list, train_nodes_list)):
+if not os.path.exists(data_dir_+"/y_hat_train.csv"):
+    y_hat_list = []
+    for epoch in range(10):
+        features_list = []
+        targets_list = []
+        count=0
+        bcc_denom = 0
+        for i, (train_graph, bce_targets_train, train_targets, train_nodes) in enumerate(zip(train_graphs, bce_targets_train_list, targets_train_list, train_nodes_list)):
+        
+            train_graph = train_graph.to(device)
+            train_features = train_graph.nodes['train_node'].data['features']
+            gene_features = train_graph.nodes['gene_node'].data['features']
+            train_feature_map = {'gene_node': gene_features, 'train_node': train_features}
 
-        train_graph = train_graph.to(device)
-        train_features = train_graph.nodes['train_node'].data['features']
-        gene_features = train_graph.nodes['gene_node'].data['features']
-        train_feature_map = {'gene_node': gene_features, 'train_node': train_features}
+            train_targets = torch.tensor(train_targets.values, dtype=torch.long).to(device)
+            bce_train_targets = torch.tensor(bce_targets_train.values.tolist()).to(device)
 
-        train_targets = torch.tensor(train_targets.values, dtype=torch.long).to(device)
-        bce_train_targets = torch.tensor(bce_targets_train.values.tolist()).to(device)
+            optimizer.zero_grad()
+            bce_feature, bce_cells = block1(train_graph, train_feature_map)
 
-        optimizer.zero_grad()
-        bce_feature, bce_cells = block1(train_graph, train_feature_map)
-        bce_loss_value = bce_loss(bce_cells, bce_train_targets.squeeze(1))
-        loss = bce_loss_value
-        for feat_out, target_out in zip(bce_cells, bce_train_targets.squeeze(1)):
-            for logit, correct in zip(feat_out, target_out):
-                logit = torch.sigmoid(logit)
-                if logit >= 0.5:
-                    logit = 1
-                else:
-                    logit = 0
-                if logit == correct:
-                    count+=1
-        bcc_denom += (len(target_out)*len(bce_cells))
-        bce_acc= count/bcc_denom
-        loss.backward()
-        optimizer.step()
-        if epoch == 99:
-            y_hat_list.append(bce_cells)
+            bce_loss_value = bce_loss(bce_cells, bce_train_targets.squeeze(1))
+            for feat_out, target_out in zip(bce_cells, bce_train_targets.squeeze(1)):
+                for logit, correct in zip(feat_out, target_out):
+                    logit = torch.sigmoid(logit)
+                    if logit >= 0.5:
+                        logit = 1
+                    else:
+                        logit = 0
+                    if logit == correct:
+                        count+=1
+            bcc_denom += (len(target_out)*len(bce_cells))
+            bce_acc= count/bcc_denom
+            bce_loss_value.backward()
+            optimizer.step()
+            if epoch == 9:
+                y_hat_list.append(bce_cells)
 
-    if (epoch+1) % 1 == 0:
-        print(f"\n[UPDATE TRAIN SET BLOCK 1] [EPOCH {epoch + 1}] BCE Loss: {bce_loss_value:.4f} | BCE_Acc: {bce_acc:.4f}")
+        if (epoch+1) % 1 == 0:
+            print(f"\n[UPDATE TRAIN SET BLOCK 1] [EPOCH {epoch + 1}] BCE Loss: {bce_loss_value:.4f} | BCE_Acc: {bce_acc:.4f}")
 
-# Reinitialize optimizer for block 2     
+    y_hat_dfs = [pd.DataFrame(tensor.cpu().detach().squeeze(1).numpy()) for tensor in y_hat_list]
+    y_hat_df = pd.concat(y_hat_dfs, ignore_index=True)
+    y_hat_df.to_csv(data_dir_+"/y_hat_train.csv", index=False, header=False)
+
+else:
+    y_hat_df = pd.read_csv(data_dir_+"/y_hat_train.csv", header=None)
+    y_hat_list = [torch.tensor(y_hat_df.iloc[i*batch_size:min((i+1)*batch_size, len(y_hat_df))].values, dtype=torch.float32).to(device) for i in range(len(y_hat_df)//batch_size + 1)]
+
+
+# Reinitialize optimizer for block 2
+y_hat_list = [tensor.detach() for tensor in y_hat_list]
+del bce_loss, ce_loss, optimizer
+torch.cuda.empty_cache() 
+gc.collect()
+bce_loss = torch.nn.BCEWithLogitsLoss()
+ce_loss = torch.nn.CrossEntropyLoss() 
 optimizer = torch.optim.SGD(block2.parameters(), lr=lr, momentum=momentum)
 
 for epoch in range(50):
@@ -349,14 +366,13 @@ for epoch in range(50):
         optimizer.zero_grad()
         feature, out_cells = block2(train_graph, train_feature_map, y_hat_list[i])
         ce_loss_value = ce_loss(out_cells, train_targets.squeeze(1))
-        lose = ce_loss_value
         for feat_out, target_out in zip(out_cells, train_targets.squeeze(1)):
             feat_out = F.softmax(feat_out, dim=0)
             feat_out = torch.argmax(feat_out)
             correct_predictions += (target_out.detach().cpu().numpy() == feat_out.detach().cpu().numpy())
             total_predictions += 1
         ce_acc = correct_predictions / total_predictions
-        loss.backward()
+        ce_loss_value.backward()
         optimizer.step()
         features_list.append(feature.cpu().detach()[(range(train_nodes))])
         targets_list.append(train_targets)
@@ -367,25 +383,84 @@ for epoch in range(50):
 
 features_dfs = [pd.DataFrame(tensor.numpy()) for tensor in features_list]
 targets_dfs = [pd.DataFrame(tensor.cpu().detach().numpy()) for tensor in targets_list]
-y_hat_dfs = [pd.DataFrame(tensor.cpu().detach().squeeze(1).numpy()) for tensor in y_hat_list]
 
 features_df = pd.concat(features_dfs, ignore_index=True)
 targets_df = pd.concat(targets_dfs, ignore_index=True)
-y_hat_df = pd.concat(y_hat_dfs, ignore_index=True)
 
 features_df.to_csv(data_dir_+"/tuned_brain_train.csv",index=False, header=False)
 targets_df.to_csv(data_dir_+"/tuned_brain_train_labels.csv", index=False, header='Cell_Type')
-y_hat_df.to_csv(data_dir_+"/y_hat_train.csv", index=False, header=False)
 
-
+# Reinitialize optimizer for block 1
+del bce_loss, ce_loss, optimizer
+torch.cuda.empty_cache() 
+gc.collect()
+bce_loss = torch.nn.BCEWithLogitsLoss()
+ce_loss = torch.nn.CrossEntropyLoss()
 optimizer = torch.optim.SGD(block1.parameters(), lr=lr, momentum=momentum)
 
-y_hat_list = []
-for epoch in range(25):
+if not os.path.exists(data_dir_+"/y_hat_test.csv"):
+    y_hat_list = []
+    for epoch in range(10):
+        features_list = []
+        targets_list = []
+        count=0
+        bcc_denom = 0
+        for i, (test_graph, bce_targets_test, test_targets, test_nodes) in enumerate(zip(test_graphs, bce_targets_test_list, targets_test_list, test_nodes_list)):
+        
+            test_graph = test_graph.to(device)
+            test_features = test_graph.nodes['train_node'].data['features']
+            gene_features = test_graph.nodes['gene_node'].data['features']
+            test_feature_map = {'gene_node': gene_features, 'train_node': test_features}
+
+            test_targets = torch.tensor(test_targets.values, dtype=torch.long).to(device)
+            bce_test_targets = torch.tensor(bce_targets_test.values.tolist()).to(device)
+
+            optimizer.zero_grad()
+            bce_feature, bce_cells = block1(test_graph, test_feature_map)
+
+            bce_loss_value = bce_loss(bce_cells, bce_test_targets.squeeze(1))
+            for feat_out, target_out in zip(bce_cells, bce_test_targets.squeeze(1)):
+                for logit, correct in zip(feat_out, target_out):
+                    logit = torch.sigmoid(logit)
+                    if logit >= 0.5:
+                        logit = 1
+                    else:
+                        logit = 0
+                    if logit == correct:
+                        count+=1
+            bcc_denom += (len(target_out)*len(bce_cells))
+            bce_acc= count/bcc_denom
+            bce_loss_value.backward()
+            optimizer.step()
+            if epoch == 9:
+                y_hat_list.append(bce_cells)
+
+        if (epoch+1) % 1 == 0:
+            print(f"\n[UPDATE TEST SET BLOCK 1] [EPOCH {epoch + 1}] BCE Loss: {bce_loss_value:.4f} | BCE_Acc: {bce_acc:.4f}")
+
+    y_hat_dfs = [pd.DataFrame(tensor.cpu().detach().squeeze(1).numpy()) for tensor in y_hat_list]
+    y_hat_df = pd.concat(y_hat_dfs, ignore_index=True)
+    y_hat_df.to_csv(data_dir_+"/y_hat_test.csv", index=False, header=False)
+
+else:
+    y_hat_df = pd.read_csv(data_dir_+"/y_hat_test.csv", header=None)
+    y_hat_list = [torch.tensor(y_hat_df.iloc[i*batch_size:min((i+1)*batch_size, len(y_hat_df))].values, dtype=torch.float32).to(device) for i in range(len(y_hat_df)//batch_size + 1)]
+
+
+# Reinitialize optimizer for block 2
+y_hat_list = [tensor.detach() for tensor in y_hat_list]
+del bce_loss, ce_loss, optimizer
+torch.cuda.empty_cache() 
+gc.collect()
+bce_loss = torch.nn.BCEWithLogitsLoss()
+ce_loss = torch.nn.CrossEntropyLoss()     
+optimizer = torch.optim.SGD(block2.parameters(), lr=lr, momentum=momentum)
+
+for epoch in range(50):
     features_list = []
     targets_list = []
-    count=0
-    bcc_denom = 0
+    correct_predictions = 0
+    total_predictions = 0
     for i, (test_graph, bce_targets_test, test_targets, test_nodes) in enumerate(zip(test_graphs, bce_targets_test_list, targets_test_list, test_nodes_list)):
 
         test_graph = test_graph.to(device)
@@ -397,60 +472,18 @@ for epoch in range(25):
         bce_test_targets = torch.tensor(bce_targets_test.values.tolist()).to(device)
 
         optimizer.zero_grad()
-        bce_feature, bce_cells = block1(test_graph, test_feature_map)
-        bce_loss_value = bce_loss(bce_cells, bce_test_targets.squeeze(1))
-        loss = bce_loss_value
-        for feat_out, target_out in zip(bce_cells, bce_test_targets.squeeze(1)):
-            for logit, correct in zip(feat_out, target_out):
-                logit = torch.sigmoid(logit)
-                if logit >= 0.5:
-                    logit = 1
-                else:
-                    logit = 0
-                if logit == correct:
-                    count+=1
-        bcc_denom += (len(target_out)*len(bce_cells))
-        bce_acc= count/bcc_denom
-        loss.backward()
-        optimizer.step()
-        if epoch == 99:
-            y_hat_list.append(bce_cells)
-
-    if (epoch+1) % 1 == 0:
-        print(f"\n[UPDATE TEST SET BLOCK 1] [EPOCH {epoch + 1}] BCE Loss: {bce_loss_value:.4f} | BCE_Acc: {bce_acc:.4f}")
-
-# Reinitialize optimizer for block 2     
-optimizer = torch.optim.SGD(block2.parameters(), lr=lr, momentum=momentum)
-
-for epoch in range(25):
-    features_list = []
-    targets_list = []
-    correct_predictions = 0
-    total_predictions = 0
-    for i, (train_graph, bce_targets_train, train_targets, train_nodes) in enumerate(zip(train_graphs, bce_targets_train_list, targets_train_list, train_nodes_list)):
-
-        train_graph = train_graph.to(device)
-        train_features = train_graph.nodes['train_node'].data['features']
-        gene_features = train_graph.nodes['gene_node'].data['features']
-        train_feature_map = {'gene_node': gene_features, 'train_node': train_features}
-
-        train_targets = torch.tensor(train_targets.values, dtype=torch.long).to(device)
-        bce_train_targets = torch.tensor(bce_targets_train.values.tolist()).to(device)
-
-        optimizer.zero_grad()
-        feature, out_cells = block2(train_graph, train_feature_map, y_hat_list[i])
-        ce_loss_value = ce_loss(out_cells, train_targets.squeeze(1))
-        lose = ce_loss_value
-        for feat_out, target_out in zip(out_cells, train_targets.squeeze(1)):
+        feature, out_cells = block2(test_graph, test_feature_map, y_hat_list[i])
+        ce_loss_value = ce_loss(out_cells, test_targets.squeeze(1))
+        for feat_out, target_out in zip(out_cells, test_targets.squeeze(1)):
             feat_out = F.softmax(feat_out, dim=0)
             feat_out = torch.argmax(feat_out)
             correct_predictions += (target_out.detach().cpu().numpy() == feat_out.detach().cpu().numpy())
             total_predictions += 1
         ce_acc = correct_predictions / total_predictions
-        loss.backward()
+        ce_loss_value.backward()
         optimizer.step()
-        features_list.append(feature.cpu().detach()[(range(train_nodes))])
-        targets_list.append(train_targets)
+        features_list.append(feature.cpu().detach()[(range(test_nodes))])
+        targets_list.append(test_targets)
 
 
     if (epoch+1) % 1 == 0:
@@ -458,14 +491,11 @@ for epoch in range(25):
 
 features_dfs = [pd.DataFrame(tensor.numpy()) for tensor in features_list]
 targets_dfs = [pd.DataFrame(tensor.cpu().detach().numpy()) for tensor in targets_list]
-y_hat_dfs = [pd.DataFrame(tensor.cpu().detach().squeeze(1).numpy()) for tensor in y_hat_list]
 
 features_df = pd.concat(features_dfs, ignore_index=True)
 targets_df = pd.concat(targets_dfs, ignore_index=True)
-y_hat_df = pd.concat(y_hat_dfs, ignore_index=True)
 
 features_df.to_csv(data_dir_+"/tuned_brain_test.csv",index=False, header=False)
 targets_df.to_csv(data_dir_+"/tuned_brain_test_labels.csv", index=False, header='Cell_Type')
-y_hat_df.to_csv(data_dir_+"/y_hat_test.csv", index=False, header=False)
 
 

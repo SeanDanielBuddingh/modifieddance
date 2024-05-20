@@ -38,10 +38,10 @@ model = WordSAGE(in_channels, hidden_channels, out_channels, num_classes).to(dev
 train_inputs, test_inputs, train_targets, test_targets = WordSAGE.read_data(self=model, seed=seed)
 
 # concatenating either y_hat_markers or y_hard_markers to the input data
-additional_vars = pd.read_csv(data_dir_+"/y_hard_train.csv", header=None)
-train_inputs = pd.concat([train_inputs, additional_vars], axis=1)
-additional_vars = pd.read_csv(data_dir_+"/y_hard_test.csv", header=None)
-test_inputs = pd.concat([test_inputs, additional_vars], axis=1)
+#additional_vars = pd.read_csv(data_dir_+"/y_hat_train.csv", header=None)
+#train_inputs = pd.concat([train_inputs, additional_vars], axis=1)
+#additional_vars = pd.read_csv(data_dir_+"/y_hat_test.csv", header=None)
+#test_inputs = pd.concat([test_inputs, additional_vars], axis=1)
 
 train_targets = torch.tensor(train_targets[0].values, dtype=torch.long).to(device)
 test_targets = torch.tensor(test_targets[0].values, dtype=torch.long).to(device)
