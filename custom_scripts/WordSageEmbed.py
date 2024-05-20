@@ -152,7 +152,7 @@ def read_data(seed):
 
     genemarkers = GeneMarkers()
     if not os.path.exists(data_dir_+"/ft_y_train.csv"):
-        full_list_train, full_list_test, _ = genemarkers.ConstructTargets(y_values_train[0], y_values_test[0], normalized_train, normalized_test, combined_brain, sublist_length=140)
+        full_list_train, full_list_test, _ = genemarkers.ConstructTargets(y_values_train[0], y_values_test[0], normalized_train, normalized_test, combined_brain, sublist_length=150)
     else:
         full_list_train = pd.read_csv(data_dir_+"/ft_y_train.csv", header=None, index_col=None)
         full_list_test = pd.read_csv(data_dir_+"/ft_y_test.csv", header=None, index_col=None)
@@ -212,7 +212,7 @@ def basic_dgl_graph(train_inputs, genes, normalized):
     return G, num_train_nodes
 
 def mix_data(seed, inputs, bce_targets, ce_targets):
-    batch_size = 512
+    batch_size = 32
     np.random.seed(seed)
     print('\nMixing Data\n')
     # Combine inputs and targets
@@ -290,7 +290,7 @@ ce_loss = torch.nn.CrossEntropyLoss()
 optimizer = torch.optim.SGD(block1.parameters(), lr=lr, momentum=momentum)
 
 y_hat_list = []
-for epoch in range(25):
+for epoch in range(50):
     features_list = []
     targets_list = []
     count=0
@@ -331,8 +331,7 @@ for epoch in range(25):
 # Reinitialize optimizer for block 2     
 optimizer = torch.optim.SGD(block2.parameters(), lr=lr, momentum=momentum)
 
-y_hat_list = []
-for epoch in range(25):
+for epoch in range(50):
     features_list = []
     targets_list = []
     correct_predictions = 0
