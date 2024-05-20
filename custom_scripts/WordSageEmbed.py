@@ -422,7 +422,6 @@ for epoch in range(25):
 # Reinitialize optimizer for block 2     
 optimizer = torch.optim.SGD(block2.parameters(), lr=lr, momentum=momentum)
 
-y_hat_list = []
 for epoch in range(25):
     features_list = []
     targets_list = []
