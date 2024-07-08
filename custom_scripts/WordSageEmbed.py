@@ -77,12 +77,11 @@ class WordSAGEBLOCK2(torch.nn.Module):
         super(WordSAGEBLOCK2, self).__init__()
         self.seed = 42
         src_dim, dst_dim = dim_tuple
-        self.dst_dim = 2675
 
         # Block 2
         self.self_attention2 = torch.nn.MultiheadAttention(hidden_channels, num_heads=1)
         self.conv3 = dgl.nn.HeteroGraphConv({
-            'connects': dgl.nn.SAGEConv((src_dim, self.dst_dim), hidden_channels, 'mean'),
+            'connects': dgl.nn.SAGEConv((src_dim, dst_dim), hidden_channels, 'mean'),
         }, aggregate='sum')
         self.bn3 = torch.nn.BatchNorm1d(hidden_channels)
         self.ln2 = torch.nn.LayerNorm(hidden_channels)
@@ -97,7 +96,6 @@ class WordSAGEBLOCK2(torch.nn.Module):
 
         # Concatenate y_hat to the features
         features['train_node'] = torch.cat([features['train_node'], y_hat], dim=1)
-        self.dst_dim = len(features['train_node'][0])
 
         # Block 2
         h = self.conv3(x, features)
@@ -152,7 +150,7 @@ def read_data(batch_size, seed):
 
     genemarkers = GeneMarkers()
     if not os.path.exists(data_dir_+"/ft_y_train.csv"):
-        full_list_train, full_list_test, _ = genemarkers.ConstructTargets(y_values_train[0], y_values_test[0], normalized_train, normalized_test, combined_brain, sublist_length=10)
+        full_list_train, full_list_test, _ = genemarkers.ConstructTargets(y_values_train[0], y_values_test[0], normalized_train, normalized_test, combined_brain, sublist_length=140)
     else:
         full_list_train = pd.read_csv(data_dir_+"/ft_y_train.csv", header=None, index_col=None)
         full_list_test = pd.read_csv(data_dir_+"/ft_y_test.csv", header=None, index_col=None)
@@ -273,6 +271,7 @@ batch_size = 32
 train_graphs, bce_targets_train_list, targets_train_list, test_graphs, bce_targets_test_list, targets_test_list, train_nodes_list, test_nodes_list = read_data(batch_size, seed=seed)
 src_dim = train_graphs[0].nodes['gene_node'].data['features'].shape[1] 
 dst_dim = 2500
+dst_dim2 = len(bce_targets_train_list[0][0][0]) + 2500
 hidden_channels = 2500
 out_channels = 2500
 num_classes = 16
@@ -284,7 +283,7 @@ momentum = 0.9
 set_seed(seed)
 
 block1 = WordSAGE((src_dim, dst_dim), hidden_channels, out_channels, num_classes, num_binary_targets).to(device)
-block2 = WordSAGEBLOCK2((src_dim, dst_dim), hidden_channels, out_channels, num_classes, num_binary_targets).to(device)
+block2 = WordSAGEBLOCK2((src_dim, dst_dim2), hidden_channels, out_channels, num_classes, num_binary_targets).to(device)
 
 bce_loss = torch.nn.BCEWithLogitsLoss()
 ce_loss = torch.nn.CrossEntropyLoss()

@@ -39,6 +39,7 @@ class WeightedFeaturePCA(BaseTransform):
             self.logger.info(f"Normalizing feature before PCA decomposition with mode={self.feat_norm_mode} "
                              f"and axis={self.feat_norm_axis}")
             feat = normalize(feat, mode=self.feat_norm_mode, axis=self.feat_norm_axis)
+            feat = np.log( ( feat * 10_000) + 1 ) # log normalization absent in original code
         gene_pca = PCA(n_components=self.n_components)
 
         self.logger.info(f"Start decomposing {self.split_name} features {feat.shape} (k={self.n_components})")
@@ -46,7 +47,9 @@ class WeightedFeaturePCA(BaseTransform):
         self.logger.info(f"Total explained variance: {gene_pca.explained_variance_ratio_.sum():.2%}")
 
         x = data.get_x()
-        cell_feat = normalize(x, mode="normalize", axis=1) @ gene_feat
+        normalized_x = normalize(x, mode="normalize", axis=1)
+        log_normalized_x = np.log( ( normalized_x * 10_000 ) + 1 )
+        cell_feat = log_normalized_x @ gene_feat
         data.data.obsm[self.out] = cell_feat.astype(np.float32)
         data.data.varm[self.out] = gene_feat.astype(np.float32)
 

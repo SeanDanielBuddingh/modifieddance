@@ -11,108 +11,73 @@ data_dir_ = parent_parent+'/dance_data'
 import torch
 import torch.nn.functional as F
 import numpy as np
-import pandas as pd
 
-import dgl
-import copy
-import gc
 from torcheval.metrics import MulticlassAUROC
-
-from sklearn.metrics import roc_auc_score, f1_score, precision_score, recall_score, confusion_matrix
-
-#ScDeepSort Imports
+from sklearn.metrics import f1_score, precision_score, recall_score, confusion_matrix
 from dance.modules.single_modality.cell_type_annotation.scdeepsort import ScDeepSort
 from dance.utils import set_seed
-
-os.environ["DGLBACKEND"] = "pytorch"
-from pprint import pprint
 from dance.datasets.singlemodality import ScDeepSortDataset
 
-import scanpy as sc
-from dance.transforms import AnnDataTransform, FilterGenesPercentile
-from dance.transforms import Compose, SetConfig
-from dance.transforms.graph import PCACellFeatureGraph, CellFeatureGraph
-from dance.typing import LogLevel, Optional
+os.environ["DGLBACKEND"] = "pytorch"
 
-import matplotlib.pyplot as plt
-from WordSage import WordSAGE
 
 train_losses = []
 train_accuracies = []
 
-
 in_channels = 400
 hidden_channels = 400
 out_channels = 100
-
-
-
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 set_seed(42)
-'''
-trl = pd.read_csv(data_dir_+'/train/mouse/mouse_Brain999_celltype.csv', header=0)
-tel = pd.read_csv(data_dir_+'/test/mouse/mouse_Brain9999_celltype.csv', header=0)
-trl['Cell'] = "C_" + trl.index.astype(str)
-tel['Cell'] = "C_" + tel.index.astype(str)
-trl.to_csv(data_dir_+'/train/mouse/mouse_Brain999_celltype.csv', index=True)
-tel.to_csv(data_dir_+'/test/mouse/mouse_Brain9999_celltype.csv', index=True)
-'''
+
+
 #ScDeepSort
-
-model = ScDeepSort(dim_in=in_channels, dim_hid=hidden_channels, num_layers=1, species='mouse', tissue='Kidney', device=torch.device('cuda'))
-
-preprocessing_pipeline = Compose(
-    AnnDataTransform(sc.pp.normalize_total, target_sum=1e4),
-    AnnDataTransform(sc.pp.log1p),
-    FilterGenesPercentile(min_val=1, max_val=99, mode="sum"),
-)
-def train_pipeline(n_components: int = 400, log_level: LogLevel = "INFO"):
-    return Compose(
-        PCACellFeatureGraph(n_components=n_components, split_name="train"),
-        SetConfig({"label_channel": "cell_type"}),
-        log_level=log_level,
-    )
-dataset = ScDeepSortDataset(species="human", tissue="Pancreas",
-                            train_dataset=["9727"], test_dataset=["2227", "1841"], data_dir = data_dir_)
+model = ScDeepSort(dim_in=in_channels, dim_hid=hidden_channels, num_layers=1, species='mouse', tissue='Brain', device=torch.device('cuda'))
+dataset = ScDeepSortDataset(species="mouse", tissue="Brain",
+                            train_dataset=["753", "3285"], test_dataset=["2695"], data_dir = data_dir_)
 data = dataset.load_data()
-#preprocessing_pipeline(data)
-#data = [train_inputs, test_inputs, 0, 0, 0]
-train_pipeline()(data)
+pipeline = model.preprocessing_pipeline()
+pipeline(data)
+
+graph = data.get_train_graph()
+print('\n',graph,'\n')
+gene_mask = graph.ndata["cell_id"] != -1
+cell_mask = graph.ndata["cell_id"] == -1
+num_genes = gene_mask.sum()
+num_cells = cell_mask.sum()
+
+print(f"Number of genes: {num_genes}")
+print(f"Number of cells: {num_cells}")
 
 y_train = data.get_train_data(return_type="torch")[1]
 y_test = data.get_test_data(return_type="torch")[1]
-print(y_train)
-print(y_test)
-y_train = torch.cat([y_train, y_test], dim=0)
 num_classes = len(torch.unique(torch.cat([y_train, y_test], dim=0)))
 y_train = torch.argmax(y_train, 1)
 y_test = torch.argmax(y_test, 1)
-#print(y_train)
-#print(y_test)
-#print(data.data.uns['CellFeatureGraph'])
-model.fit(graph=data.data.uns["CellFeatureGraph"], labels=y_train)
+
+model.fit(graph=2, labels=y_train)
 train_losses = model.train_losses
 train_accuracies = model.train_accuracies
-'''
-plt.figure(figsize=(10, 5))
-plt.subplot(1, 2, 1)
-plt.plot(range(1, 300 + 1), train_losses, label='Train Loss')
-plt.xlabel('Epoch')
-plt.ylabel('Loss')
-plt.title('Training Loss')
-plt.legend()
 
-# Plotting the training accuracy
-plt.subplot(1, 2, 2)
-plt.plot(range(1, 300 + 1), train_accuracies, label='Train Accuracy')
-plt.xlabel('Epoch')
-plt.ylabel('Accuracy')
-plt.title('Training Accuracy')
-plt.legend()
+# plt.figure(figsize=(10, 5))
+# plt.subplot(1, 2, 1)
+# plt.plot(range(1, 300 + 1), train_losses, label='Train Loss')
+# plt.xlabel('Epoch')
+# plt.ylabel('Loss')
+# plt.title('Training Loss')
+# plt.legend()
 
-plt.tight_layout()
-plt.show()
-'''
+# # Plotting the training accuracy
+# plt.subplot(1, 2, 2)
+# plt.plot(range(1, 300 + 1), train_accuracies, label='Train Accuracy')
+# plt.xlabel('Epoch')
+# plt.ylabel('Accuracy')
+# plt.title('Training Accuracy')
+# plt.legend()
+
+# plt.tight_layout()
+# plt.show()
+
 with torch.no_grad():
     result = model.predict_proba(graph=data.data.uns["CellFeatureGraph"])
 
