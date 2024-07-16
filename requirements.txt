@@ -4,7 +4,7 @@ leidenalg==0.10.1
 mudata==0.2.3
 networkx==3.1
 numba==0.57.1
-numpy==1.22.4
+numpy==1.23.5
 opencv-python==4.8.0.76
 openpyxl==3.1.2
 pandas==2.1.0
@@ -21,3 +21,6 @@ tables==3.8.0
 threadpoolctl==3.2.0
 torchnmf==0.3.5
 tqdm==4.66.1
+torcheval==0.0.7
+dgl==1.1.2
+torchvision==0.17.2

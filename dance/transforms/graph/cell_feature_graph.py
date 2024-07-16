@@ -6,6 +6,8 @@ from dance.transforms.base import BaseTransform
 from dance.transforms.cell_feature import WeightedFeaturePCA
 from dance.typing import LogLevel, Optional
 
+from sklearn.model_selection import train_test_split # added
+
 class CellFeatureGraph(BaseTransform):
 
     def __init__(self, cell_feature_channel: str, gene_feature_channel: Optional[str] = None, *,
@@ -22,7 +24,7 @@ class CellFeatureGraph(BaseTransform):
         x_sparse = data.get_feature(return_type="sparse", channel=self.cell_feature_channel, mod=self.mod)
         g = dgl.bipartite_from_scipy(x_sparse, utype="cell", etype="expression", vtype="feature", eweight_name="weight")
         g = dgl.ToSimple()(g)
-        g = dgl.AddSelfLoop(edge_feat_names="weight")(g)
+        g = dgl.AddSelfLoop(edge_feat_nameßs="weight")(g)
         g = dgl.AddReverse(copy_edata=True)(g)
         g.ndata["weight"] = dgl.nn.EdgeWeightNorm(norm="both")(g, g.ndata["weight"])
         data.data.uns[self.out] = g
@@ -30,11 +32,23 @@ class CellFeatureGraph(BaseTransform):
 
     def __call__(self, data):
         feat = data.get_feature(return_type="default", mod=self.mod)
-        
+        label = data.get_y() # added
+
         # mixing and splitting train and test randomly as per internal dataset guideline in scdeepsort paper
-        np.random.shuffle(feat)
-        feat_train, feat_test
-        
+        combined = list(zip(feat, label))
+        np.random.shuffle(combined)
+        feat, label = zip(*combined)
+        feat = np.array(feat)
+        label = np.array(label)
+        feat_train, feat_test, labels_train, labels_test = train_test_split(feat, labels, test_size=0.2, random_state=42)
+        train_cells = len(feat_train)
+        test_cells = len(feat_test)
+        feat = np.vstack((feat_train, feat_test))
+        label = np.vstack((labels_train, labels_test))
+
+        print(feat)
+        print(label)
+
         num_cells, num_feats = feat.shape
 
         row, col = np.nonzero(feat)
