@@ -31,27 +31,28 @@ class CellFeatureGraph(BaseTransform):
         return data
 
     def __call__(self, data):
-        feat = data.get_feature(return_type="default", mod=self.mod)
-        label = data.get_y() # added
-
+        feat = data.get_x()
+        label = data.obsm['cell_type'].values
+        print('\nFeatures: ', feat.shape)
         # mixing and splitting train and test randomly as per internal dataset guideline in scdeepsort paper
         combined = list(zip(feat, label))
         np.random.shuffle(combined)
         feat, label = zip(*combined)
         feat = np.array(feat)
         label = np.array(label)
-        feat_train, feat_test, labels_train, labels_test = train_test_split(feat, labels, test_size=0.2, random_state=42)
+        feat_train, feat_test, labels_train, labels_test = train_test_split(feat, label, test_size=0.2, random_state=42)
         train_cells = len(feat_train)
         test_cells = len(feat_test)
         feat = np.vstack((feat_train, feat_test))
         label = np.vstack((labels_train, labels_test))
 
-        print(feat)
-        print(label)
+        #print('\n Features: ', feat)
+        #print('\n Labels: ', label.shape)
 
         num_cells, num_feats = feat.shape
 
         row, col = np.nonzero(feat)
+
         edata = np.array(feat[row, col])[:, None]
         self.logger.info(f"Number of nonzero entries: {edata.size:,}")
         self.logger.info(f"Nonzero rate = {edata.size / num_cells / num_feats:.1%}")
@@ -70,9 +71,12 @@ class CellFeatureGraph(BaseTransform):
         g.edata["weight"] = edata
         # FIX: change to feat_id
         g.ndata["cell_id"] = torch.concat((torch.arange(num_feats, dtype=torch.int32),
-                                           -torch.ones(train_cells, dtype=torch.int32)))  # yapf: disable
+                                           -torch.ones(train_cells, dtype=torch.int32),
+                                           -2*torch.ones(test_cells, dtype=torch.int32)))  # yapf: disable
+
         g.ndata["feat_id"] = torch.concat((-torch.ones(num_feats, dtype=torch.int32),
-                                           torch.arange(num_cells, dtype=torch.int32)))  # yapf: disable
+                                           torch.arange(train_cells, dtype=torch.int32),
+                                           -2*torch.ones(test_cells, dtype=torch.int32)))  # yapf: disable
 
         # Normalize edges and add self-loop
         if self.normalize_edges:
@@ -88,9 +92,14 @@ class CellFeatureGraph(BaseTransform):
                                         channel_type="varm")
         cell_feature = data.get_feature(return_type="torch", channel=self.cell_feature_channel, mod=self.mod,
                                         channel_type="obsm")
-        g.ndata["features"] = torch.vstack((gene_feature, cell_feature))
+        feature_stack = torch.vstack((gene_feature, cell_feature))
+        g.ndata["features"] = feature_stack
 
         data.data.uns[self.out] = g
+        data.data.uns["TrainCells"] = train_cells
+        data.data.uns["TestCells"] = test_cells
+        data.data.uns["TrainLabels"] = labels_train
+        data.data.uns["TestLabels"] = labels_test
 
         return data
 
@@ -122,8 +131,10 @@ class PCACellFeatureGraph(BaseTransform):
     def __call__(self, data):
         WeightedFeaturePCA(self.n_components, self.split_name, feat_norm_mode=self.feat_norm_mode,
                            feat_norm_axis=self.feat_norm_axis, log_level=self.log_level)(data)
+        print('\nWeightedFeaturePCA done')
         CellFeatureGraph(cell_feature_channel="WeightedFeaturePCA", mod=self.mod, normalize_edges=self.normalize_edges,
                          log_level=self.log_level)(data)
+        print('\nCellFeatureGraph done\n')
         return data
 
 

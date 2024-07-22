@@ -158,10 +158,12 @@ class ScDeepSort(BaseClassificationMethod):
             Ratio of the training data to hold out for validation.
 
         """
-        gene_mask = graph.ndata["cell_id"] != -1
+        gene_mask = (graph.ndata["cell_id"] != -1) & (graph.ndata["cell_id"] != -2)
         cell_mask = graph.ndata["cell_id"] == -1
+        test_cell_mask = graph.ndata["cell_id"] == -2
         num_genes = gene_mask.sum()
         num_cells = cell_mask.sum()
+        num_test_cells = test_cell_mask.sum()
         # TODO: remove reliance on num_labels in other methods
         self.num_labels = labels.max().item() + 1
 
@@ -170,8 +172,10 @@ class ScDeepSort(BaseClassificationMethod):
         val_idx = perm[:num_val].to(self.device)
         train_idx = perm[num_val:].to(self.device)
 
-        full_labels = -torch.ones(num_genes + num_cells, dtype=torch.long)
-        full_labels[-num_cells:] = labels
+        full_labels = -torch.ones(num_genes + num_cells + num_test_cells, dtype=torch.long)
+        full_labels[-(num_cells + num_test_cells):] = labels
+        print("Size label:", full_labels.size())
+        print("Size original label:", labels.size())
         graph = graph.to(self.device)
         graph.ndata["label"] = full_labels.to(self.device)
 
@@ -314,7 +318,7 @@ class ScDeepSort(BaseClassificationMethod):
         """
         self.model.eval()
 
-        cell_mask = graph.ndata["cell_id"] == -1
+        cell_mask = graph.ndata["cell_id"] == -2
         idx = torch.where(cell_mask)[0].to(self.device)
         graph = graph.to(self.device)
 
