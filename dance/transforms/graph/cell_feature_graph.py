@@ -31,16 +31,17 @@ class CellFeatureGraph(BaseTransform):
         return data
 
     def __call__(self, data):
-        feat = data.get_x()
-        label = data.obsm['cell_type'].values
-        print('\nFeatures: ', feat.shape)
-        # mixing and splitting train and test randomly as per internal dataset guideline in scdeepsort paper
-        combined = list(zip(feat, label))
-        np.random.shuffle(combined)
-        feat, label = zip(*combined)
-        feat = np.array(feat)
-        label = np.array(label)
-        feat_train, feat_test, labels_train, labels_test = train_test_split(feat, label, test_size=0.2, random_state=42)
+        #feat = data.get_x()
+        #label = data.obsm['cell_type'].values
+        #print('\nFeatures: ', feat.shape)
+
+        feat_train, labels_train = data.get_train_data(return_type="torch")
+        feat_test, labels_test = data.get_test_data(return_type="torch")
+        # torch.set_printoptions(threshold=torch.inf)
+        # print(labels_train[0:9])
+        # print(labels_test[0:9])
+        
+        #feat_train, feat_test, labels_train, labels_test = train_test_split(feat, label, test_size=0.2, random_state=42)
         train_cells = len(feat_train)
         test_cells = len(feat_test)
         feat = np.vstack((feat_train, feat_test))

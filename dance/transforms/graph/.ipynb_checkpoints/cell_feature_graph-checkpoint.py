@@ -6,6 +6,8 @@ from dance.transforms.base import BaseTransform
 from dance.transforms.cell_feature import WeightedFeaturePCA
 from dance.typing import LogLevel, Optional
 
+from sklearn.model_selection import train_test_split # added
+
 class CellFeatureGraph(BaseTransform):
 
     def __init__(self, cell_feature_channel: str, gene_feature_channel: Optional[str] = None, *,
@@ -22,22 +24,36 @@ class CellFeatureGraph(BaseTransform):
         x_sparse = data.get_feature(return_type="sparse", channel=self.cell_feature_channel, mod=self.mod)
         g = dgl.bipartite_from_scipy(x_sparse, utype="cell", etype="expression", vtype="feature", eweight_name="weight")
         g = dgl.ToSimple()(g)
-        g = dgl.AddSelfLoop(edge_feat_names="weight")(g)
+        g = dgl.AddSelfLoop(edge_feat_nameßs="weight")(g)
         g = dgl.AddReverse(copy_edata=True)(g)
         g.ndata["weight"] = dgl.nn.EdgeWeightNorm(norm="both")(g, g.ndata["weight"])
         data.data.uns[self.out] = g
         return data
 
     def __call__(self, data):
-        feat = data.get_feature(return_type="default", mod=self.mod)
+        #feat = data.get_x()
+        #label = data.obsm['cell_type'].values
+        #print('\nFeatures: ', feat.shape)
+
+        feat_train, labels_train = data.get_train_data(return_type="torch")
+        feat_test, labels_test = data.get_test_data(return_type="torch")
+        # torch.set_printoptions(threshold=torch.inf)
+        # print(labels_train[0:9])
+        # print(labels_test[0:9])
         
-        # mixing and splitting train and test randomly as per internal dataset guideline in scdeepsort paper
-        np.random.shuffle(feat)
-        feat_train, feat_test
-        
+        #feat_train, feat_test, labels_train, labels_test = train_test_split(feat, label, test_size=0.2, random_state=42)
+        train_cells = len(feat_train)
+        test_cells = len(feat_test)
+        feat = np.vstack((feat_train, feat_test))
+        label = np.vstack((labels_train, labels_test))
+
+        #print('\n Features: ', feat)
+        #print('\n Labels: ', label.shape)
+
         num_cells, num_feats = feat.shape
 
         row, col = np.nonzero(feat)
+
         edata = np.array(feat[row, col])[:, None]
         self.logger.info(f"Number of nonzero entries: {edata.size:,}")
         self.logger.info(f"Nonzero rate = {edata.size / num_cells / num_feats:.1%}")
@@ -56,9 +72,12 @@ class CellFeatureGraph(BaseTransform):
         g.edata["weight"] = edata
         # FIX: change to feat_id
         g.ndata["cell_id"] = torch.concat((torch.arange(num_feats, dtype=torch.int32),
-                                           -torch.ones(train_cells, dtype=torch.int32)))  # yapf: disable
+                                           -torch.ones(train_cells, dtype=torch.int32),
+                                           -2*torch.ones(test_cells, dtype=torch.int32)))  # yapf: disable
+
         g.ndata["feat_id"] = torch.concat((-torch.ones(num_feats, dtype=torch.int32),
-                                           torch.arange(num_cells, dtype=torch.int32)))  # yapf: disable
+                                           torch.arange(train_cells, dtype=torch.int32),
+                                           -2*torch.ones(test_cells, dtype=torch.int32)))  # yapf: disable
 
         # Normalize edges and add self-loop
         if self.normalize_edges:
@@ -74,9 +93,14 @@ class CellFeatureGraph(BaseTransform):
                                         channel_type="varm")
         cell_feature = data.get_feature(return_type="torch", channel=self.cell_feature_channel, mod=self.mod,
                                         channel_type="obsm")
-        g.ndata["features"] = torch.vstack((gene_feature, cell_feature))
+        feature_stack = torch.vstack((gene_feature, cell_feature))
+        g.ndata["features"] = feature_stack
 
         data.data.uns[self.out] = g
+        data.data.uns["TrainCells"] = train_cells
+        data.data.uns["TestCells"] = test_cells
+        data.data.uns["TrainLabels"] = labels_train
+        data.data.uns["TestLabels"] = labels_test
 
         return data
 
@@ -108,8 +132,10 @@ class PCACellFeatureGraph(BaseTransform):
     def __call__(self, data):
         WeightedFeaturePCA(self.n_components, self.split_name, feat_norm_mode=self.feat_norm_mode,
                            feat_norm_axis=self.feat_norm_axis, log_level=self.log_level)(data)
+        print('\nWeightedFeaturePCA done')
         CellFeatureGraph(cell_feature_channel="WeightedFeaturePCA", mod=self.mod, normalize_edges=self.normalize_edges,
                          log_level=self.log_level)(data)
+        print('\nCellFeatureGraph done\n')
         return data
 
 

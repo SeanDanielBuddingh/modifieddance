@@ -133,8 +133,8 @@ class ScDeepSort(BaseClassificationMethod):
     @staticmethod
     def preprocessing_pipeline(n_components: int = 400, log_level: LogLevel = "INFO"):
         return Compose(
-            PCACellFeatureGraph(n_components=n_components, split_name="train"),
             SetConfig({"label_channel": "cell_type"}),
+            PCACellFeatureGraph(n_components=n_components, split_name="train"),
             log_level=log_level,
         )
 
