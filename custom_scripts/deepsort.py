@@ -36,6 +36,11 @@ model = ScDeepSort(dim_in=in_channels, dim_hid=hidden_channels, num_layers=1, sp
 dataset = ScDeepSortDataset(species="mouse", tissue="Brain",
                             train_dataset=["753", "3285"], test_dataset=["2695"], data_dir = data_dir_)
 data = dataset.load_data()
+# feat_train, labels_train = data.get_train_data(return_type="torch")
+# feat_test, labels_test = data.get_test_data(return_type="torch")
+# torch.set_printoptions(threshold=torch.inf)
+# print(labels_train[0:9])
+# print(labels_test[0:9])
 pipeline = model.preprocessing_pipeline()
 pipeline(data)
 

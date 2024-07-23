@@ -36,26 +36,27 @@ model = ScDeepSort(dim_in=in_channels, dim_hid=hidden_channels, num_layers=1, sp
 dataset = ScDeepSortDataset(species="mouse", tissue="Brain",
                             train_dataset=["753", "3285"], test_dataset=["2695"], data_dir = data_dir_)
 data = dataset.load_data()
+# feat_train, labels_train = data.get_train_data(return_type="torch")
+# feat_test, labels_test = data.get_test_data(return_type="torch")
+# torch.set_printoptions(threshold=torch.inf)
+# print(labels_train[0:9])
+# print(labels_test[0:9])
 pipeline = model.preprocessing_pipeline()
 pipeline(data)
 
-graph = data.get_train_graph()
-print('\n',graph,'\n')
-gene_mask = graph.ndata["cell_id"] != -1
-cell_mask = graph.ndata["cell_id"] == -1
-num_genes = gene_mask.sum()
-num_cells = cell_mask.sum()
+graph = data.data.uns['CellFeatureGraph']
+labels = torch.tensor(data.data.uns['TrainLabels'])
+test_labels = torch.tensor(data.data.uns['TestLabels'])
 
-print(f"Number of genes: {num_genes}")
-print(f"Number of cells: {num_cells}")
+num_classes = len(torch.unique(torch.cat([labels, test_labels], dim=0)))
+print(
+    f"Number of classes: {num_classes}, Number of training samples: {labels.shape[0]}, Number of test samples: {test_labels.shape[0]}"
+)
+y_train = torch.argmax(labels, 1)
+y_test = torch.argmax(test_labels, 1)
+all_labels = torch.cat([y_train, y_test], dim=0)
 
-y_train = data.get_train_data(return_type="torch")[1]
-y_test = data.get_test_data(return_type="torch")[1]
-num_classes = len(torch.unique(torch.cat([y_train, y_test], dim=0)))
-y_train = torch.argmax(y_train, 1)
-y_test = torch.argmax(y_test, 1)
-
-model.fit(graph=2, labels=y_train)
+model.fit(graph=graph, labels=all_labels)
 train_losses = model.train_losses
 train_accuracies = model.train_accuracies
 
