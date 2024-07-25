@@ -1,2 +1,0 @@
-import deepsort
-import deepsort_w2v

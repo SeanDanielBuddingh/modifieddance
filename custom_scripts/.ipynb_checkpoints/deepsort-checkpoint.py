@@ -20,91 +20,96 @@ from dance.datasets.singlemodality import ScDeepSortDataset
 
 os.environ["DGLBACKEND"] = "pytorch"
 
+def custom_print(message, file=None):
+    if file:
+        with open(file, 'a') as f:
+            f.write(message + '\n')
+            
+datasets = ['mouse_Brain', 'mouse_Kidney', 'human_Pancreas', 'human_Spleen', 'human_Bonemarrow']
+for datasetname in datasets:
+    
+    if datasetname == 'mouse_Brain':
+        dataset = ScDeepSortDataset(species="mouse", tissue="Brain",
+                                train_dataset=["753", "3285"], test_dataset=["2695"], data_dir = data_dir_)
+        
+    elif datasetname == 'mouse_Kidney':
+        dataset = ScDeepSortDataset(species="mouse", tissue="Kidney",
+                                train_dataset=["4682"], test_dataset=["203"], data_dir = data_dir_)
+        
+    elif datasetname == 'human_Pancreas':
+        dataset = ScDeepSortDataset(species="human", tissue="Pancreas",
+                                train_dataset=["9727"], test_dataset=["2227", "1841"], data_dir = data_dir_)
+        
+    elif datasetname == 'human_Spleen':
+        dataset = ScDeepSortDataset(species="human", tissue="Spleen",
+                                train_dataset=["15806"], test_dataset=["9887"], data_dir = data_dir_)
+        
+    elif datasetname == 'human_Bonemarrow':
+        dataset = ScDeepSortDataset(species="human", tissue="Bonemarrow",
+                                train_dataset=["2261"], test_dataset=["6443"], data_dir = data_dir_)
+        
+    train_losses = []
+    train_accuracies = []
 
-train_losses = []
-train_accuracies = []
+    in_channels = 400
+    hidden_channels = 400
+    out_channels = 100
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    set_seed(42)
 
-in_channels = 400
-hidden_channels = 400
-out_channels = 100
-device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-set_seed(42)
+    species, tissue = datasetname.split('_')
+    #ScDeepSort
+    model = ScDeepSort(dim_in=in_channels, dim_hid=hidden_channels, num_layers=1, species=species, tissue=tissue, device=torch.device('cuda'))
+    data = dataset.load_data()
 
+    pipeline = model.preprocessing_pipeline()
+    pipeline(data)
 
-#ScDeepSort
-model = ScDeepSort(dim_in=in_channels, dim_hid=hidden_channels, num_layers=1, species='mouse', tissue='Brain', device=torch.device('cuda'))
-dataset = ScDeepSortDataset(species="mouse", tissue="Brain",
-                            train_dataset=["753", "3285"], test_dataset=["2695"], data_dir = data_dir_)
-data = dataset.load_data()
-# feat_train, labels_train = data.get_train_data(return_type="torch")
-# feat_test, labels_test = data.get_test_data(return_type="torch")
-# torch.set_printoptions(threshold=torch.inf)
-# print(labels_train[0:9])
-# print(labels_test[0:9])
-pipeline = model.preprocessing_pipeline()
-pipeline(data)
+    graph = data.data.uns['CellFeatureGraph']
+    labels = torch.tensor(data.data.uns['TrainLabels'])
+    test_labels = torch.tensor(data.data.uns['TestLabels'])
 
-graph = data.data.uns['CellFeatureGraph']
-labels = torch.tensor(data.data.uns['TrainLabels'])
-test_labels = torch.tensor(data.data.uns['TestLabels'])
+    num_classes = len(torch.unique(torch.cat([labels, test_labels], dim=0)))
+    print(
+        f"Number of classes: {num_classes}, Number of training samples: {labels.shape[0]}, Number of test samples: {test_labels.shape[0]}"
+    )
+    y_train = torch.argmax(labels, 1)
+    y_test = torch.argmax(test_labels, 1)
+    all_labels = torch.cat([y_train, y_test], dim=0)
 
-num_classes = len(torch.unique(torch.cat([labels, test_labels], dim=0)))
-print(
-    f"Number of classes: {num_classes}, Number of training samples: {labels.shape[0]}, Number of test samples: {test_labels.shape[0]}"
-)
-y_train = torch.argmax(labels, 1)
-y_test = torch.argmax(test_labels, 1)
-all_labels = torch.cat([y_train, y_test], dim=0)
+    model.fit(graph=graph, labels=all_labels)
+    train_losses = model.train_losses
+    train_accuracies = model.train_accuracies
 
-model.fit(graph=graph, labels=all_labels)
-train_losses = model.train_losses
-train_accuracies = model.train_accuracies
+    with torch.no_grad():
+        result = model.predict_proba(graph=data.data.uns["CellFeatureGraph"])
 
-# plt.figure(figsize=(10, 5))
-# plt.subplot(1, 2, 1)
-# plt.plot(range(1, 300 + 1), train_losses, label='Train Loss')
-# plt.xlabel('Epoch')
-# plt.ylabel('Loss')
-# plt.title('Training Loss')
-# plt.legend()
+    result = result[-len(y_test):]
+    result = torch.tensor(result)
+    predicted = torch.argmax(result, 1)
+    #torch.set_printoptions(profile="full")
+    #print(predicted)
+    correct = (predicted == y_test).sum().item()
+    total = y_test.numel()
+    accuracy = correct / total
 
-# # Plotting the training accuracy
-# plt.subplot(1, 2, 2)
-# plt.plot(range(1, 300 + 1), train_accuracies, label='Train Accuracy')
-# plt.xlabel('Epoch')
-# plt.ylabel('Accuracy')
-# plt.title('Training Accuracy')
-# plt.legend()
+    auc = MulticlassAUROC(num_classes=num_classes)
+    auc.update(result.cpu(), y_test.cpu())
+    f1 = f1_score(y_test.cpu(), predicted.cpu(), average='macro')
+    precision = precision_score(y_test.cpu(), predicted.cpu(), average='macro')
+    recall = recall_score(y_test.cpu(), predicted.cpu(), average='macro')
 
-# plt.tight_layout()
-# plt.show()
+    # For specificity, calculate the confusion matrix and derive specificity
+    cm = confusion_matrix(y_test.cpu(), predicted.cpu())
+    specificity = np.sum(np.diag(cm)) / np.sum(cm)
 
-with torch.no_grad():
-    result = model.predict_proba(graph=data.data.uns["CellFeatureGraph"])
+    file = 'results.txt'
+    custom_print('\nScDeepSort '+datasetname, file)
+    custom_print(f"ACC: {acc}", file)
+    custom_print(f"Macro AUC: {auc.compute()}", file)
+    custom_print(f"F1: {f1}", file)
+    custom_print(f"Precision: {precision}", file)
+    custom_print(f"Recall: {recall}", file)
+    custom_print(f"Specificity: {specificity}", file)
 
-result = result[-len(y_test):]
-result = torch.tensor(result)
-predicted = torch.argmax(result, 1)
-#torch.set_printoptions(profile="full")
-#print(predicted)
-correct = (predicted == y_test).sum().item()
-total = y_test.numel()
-accuracy = correct / total
-
-auc = MulticlassAUROC(num_classes=num_classes)
-auc.update(result.cpu(), y_test.cpu())
-f1 = f1_score(y_test.cpu(), predicted.cpu(), average='macro')
-precision = precision_score(y_test.cpu(), predicted.cpu(), average='macro')
-recall = recall_score(y_test.cpu(), predicted.cpu(), average='macro')
-
-# For specificity, calculate the confusion matrix and derive specificity
-cm = confusion_matrix(y_test.cpu(), predicted.cpu())
-specificity = np.sum(np.diag(cm)) / np.sum(cm)
-
-print(f"ACC: {accuracy}")
-print(f"Macro AUC: {auc.compute()}")
-print(f"F1: {f1}")
-print(f"Precision: {precision}")
-print(f"Recall: {recall}")
-print(f"Specificity: {specificity}")
 

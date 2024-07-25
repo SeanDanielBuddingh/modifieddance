@@ -9,7 +9,60 @@ from dance.transforms import Compose, SetConfig, WeightedFeaturePCA
 from dance.typing import LogLevel, Optional
 from dance.utils.deprecate import deprecated
 
+from dance.transforms.base import BaseTransform
+# Steps for the SVM preprocessing pipeline from the paper mentioned in dance readme.
 
+class CombinedCellGeneFilter(BaseTransform):
+    """
+    Combined filter for genes and cells based on various criteria.
+    
+    Parameters
+    ----------
+    mad_threshold : float
+        Threshold for filtering cells based on number of detected genes.
+    min_cells_per_population : int
+        Minimum number of cells required for a cell population to be retained.
+    """
+    DISPLAY_ATTRS = ("mad_threshold", "min_cells_per_population")
+
+    def __init__(self, mad_threshold: float = 3, min_cells_per_population: int = 10, **kwargs):
+        super().__init__(**kwargs)
+        self.mad_threshold = mad_threshold
+        self.min_cells_per_population = min_cells_per_population
+
+    def __call__(self, data):
+        # Get the data as a numpy array
+        X = data.get_x()
+        y = data.get_y()  # Assuming this returns labels as a numpy array
+        cell_mask = np.ones(X.shape[0], dtype=bool)
+        
+        # Filter genes with zero counts
+        gene_counts = X.sum(axis=0)
+        non_zero_genes = gene_counts > 0
+        X = X[:, non_zero_genes]
+
+        # Filter cells by detected genes
+        detected_genes = (X > 0).sum(axis=1)
+        median_detected_genes = np.median(detected_genes)
+        mad = np.median(np.abs(detected_genes - median_detected_genes))
+        threshold = median_detected_genes - self.mad_threshold * mad
+        cell_mask = cell_mask & (detected_genes >= threshold)
+        X = X[cell_mask]
+        y = y[cell_mask]
+
+        # Filter cell populations
+        population_counts = y.sum(axis=0)
+        large_populations = population_counts >= self.min_cells_per_population
+        cell_mask = cell_mask & (y[:, large_populations].any(axis=1))
+        X = X[cell_mask]
+        y = y[cell_mask]
+
+        data.data.obsm[self.out] = X
+        #data.data.varm[self.out] = X.T
+        data.data.obsm['cell_type'] = y
+
+        return data
+    
 class SVM(BaseClassificationMethod):
     """The SVM cell-type classification model.
 
@@ -26,35 +79,16 @@ class SVM(BaseClassificationMethod):
         self.args = args
         self.random_state = random_state
         self._mdl = SVC(random_state=random_state, probability=True)
-
+        
     @staticmethod
     def preprocessing_pipeline(n_components: int = 400, log_level: LogLevel = "INFO"):
-        def filter_genes(data):
-            logger.info("Filtering out genes with zero counts across all cells...")
-            non_zero_genes = (data.sum(axis=0) > 0)
-            return data.loc[:, non_zero_genes]
-
-        def filter_cells_by_detected_genes(data):
-            logger.info("Filtering out cells with detected genes below three MAD from the median...")
-            detected_genes = (data > 0).sum(axis=1)
-            median_detected_genes = np.median(detected_genes)
-            mad = np.median(np.abs(detected_genes - median_detected_genes))
-            threshold = median_detected_genes - 3 * mad
-            return data[detected_genes >= threshold]
-
-        def filter_cell_populations(data):
-            logger.info("Excluding cell populations with less than 10 cells across the entire dataset...")
-            population_counts = data['label'].value_counts()
-            large_populations = population_counts[population_counts >= 10].index
-            return data[data['label'].isin(large_populations)]
-        
         return Compose(
-            filter_genes(data),
-            filter_cells_by_detected_genes(data),
-            filter_cell_populations(data),
             SetConfig({
-                "feature_channel": "WeightedFeaturePCA",
                 "label_channel": "cell_type"
+            }),
+            CombinedCellGeneFilter(mad_threshold=3, min_cells_per_population=10),
+            SetConfig({
+                "feature_channel": "CombinedCellGeneFilter"
             }),
             log_level=log_level,
         )

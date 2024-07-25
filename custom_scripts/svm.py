@@ -24,55 +24,82 @@ from dance.datasets.singlemodality import ScDeepSortDataset
 #SVM
 from dance.modules.single_modality.cell_type_annotation.svm import SVM
 
+def custom_print(message, file=None):
+    if file:
+        with open(file, 'a') as f:
+            f.write(message + '\n')
+            
+datasets = ['mouse_Brain', 'mouse_Kidney', 'human_Pancreas', 'human_Spleen', 'human_Bonemarrow']
+for datasetname in datasets:
+    
+    if datasetname == 'mouse_Brain':
+        dataset = ScDeepSortDataset(species="mouse", tissue="Brain",
+                                train_dataset=["753", "3285"], test_dataset=["2695"], data_dir = data_dir_)
+        
+    elif datasetname == 'mouse_Kidney':
+        dataset = ScDeepSortDataset(species="mouse", tissue="Kidney",
+                                train_dataset=["4682"], test_dataset=["203"], data_dir = data_dir_)
+        
+    elif datasetname == 'human_Pancreas':
+        dataset = ScDeepSortDataset(species="human", tissue="Pancreas",
+                                train_dataset=["9727"], test_dataset=["2227", "1841"], data_dir = data_dir_)
+        
+    elif datasetname == 'human_Spleen':
+        dataset = ScDeepSortDataset(species="human", tissue="Spleen",
+                                train_dataset=["15806"], test_dataset=["9887"], data_dir = data_dir_)
+        
+    elif datasetname == 'human_Bonemarrow':
+        dataset = ScDeepSortDataset(species="human", tissue="Bonemarrow",
+                                train_dataset=["2261"], test_dataset=["6443"], data_dir = data_dir_)
 
-device = torch.device('cpu' if torch.cuda.is_available() else 'cpu')
-seed = 42
-set_seed(42)
+    device = torch.device('cpu' if torch.cuda.is_available() else 'cpu')
+    seed = 42
+    set_seed(42)
 
-#Celltypist
-model = SVM(True)
-preprocessing_pipeline = model.preprocessing_pipeline()
-dataset = ScDeepSortDataset(species="mouse", tissue="Brain",
-                            train_dataset=["753", "3285"], test_dataset=["2695"], data_dir = data_dir_)
-data = dataset.load_data()
-preprocessing_pipeline(data)
+    model = SVM(True)
+    preprocessing_pipeline = model.preprocessing_pipeline()
 
-x_train, y_train = data.get_train_data(return_type="torch")
-x_test, y_test = data.get_test_data(return_type="torch")
-seed = 42
-y_train = torch.argmax(y_train, dim=1)
-y_test = torch.argmax(y_test, dim=1)
-num_classes = len(torch.unique(torch.cat([y_train, y_test], dim=0)))
+    data = dataset.load_data()
+    preprocessing_pipeline(data)
 
-set_seed(42)
+    x_train, y_train = data.get_train_data(return_type="torch")
+    x_test, y_test = data.get_test_data(return_type="torch")
+    seed = 42
+    y_train = torch.argmax(y_train, dim=1)
+    y_test = torch.argmax(y_test, dim=1)
+    num_classes = len(torch.unique(torch.cat([y_train, y_test], dim=0)))
 
-x_train.to(device)
-y_train.to(device)
-x_test.to(device)
-y_test.to(device)
-print(y_test.shape)
+    set_seed(42)
 
-model.fit(x= x_train, y=y_train)
+    x_train.to(device)
+    y_train.to(device)
+    x_test.to(device)
+    y_test.to(device)
+    print(y_test.shape)
 
-pred = model.predict(x_test.numpy()) 
-probs = model._mdl.predict_proba(x_test.numpy())
+    model.fit(x= x_train, y=y_train)
 
-acc = accuracy_score(y_test.cpu(), pred)
+    pred = model.predict(x_test.numpy()) 
+    probs = model._mdl.predict_proba(x_test.numpy())
 
-auc = MulticlassAUROC(num_classes=num_classes)
-auc.update(torch.as_tensor(probs).cpu(), y_test.cpu())
-f1 = f1_score(y_test.cpu(), pred, average='macro')
-precision = precision_score(y_test.cpu(), pred, average='macro')
-recall = recall_score(y_test.cpu(), pred, average='macro')
+    acc = accuracy_score(y_test.cpu(), pred)
 
-# For specificity, calculate the confusion matrix and derive specificity
-cm = confusion_matrix(y_test.cpu(), pred)
-specificity = np.sum(np.diag(cm)) / np.sum(cm)
+    auc = MulticlassAUROC(num_classes=num_classes)
+    auc.update(torch.as_tensor(probs).cpu(), y_test.cpu())
+    f1 = f1_score(y_test.cpu(), pred, average='macro')
+    precision = precision_score(y_test.cpu(), pred, average='macro')
+    recall = recall_score(y_test.cpu(), pred, average='macro')
 
-print(f"ACC: {acc}")
-print(f"Macro AUC: {auc.compute()}")
-print(f"F1: {f1}")
-print(f"Precision: {precision}")
-print(f"Recall: {recall}")
-print(f"Specificity: {specificity}")
+    # For specificity, calculate the confusion matrix and derive specificity
+    cm = confusion_matrix(y_test.cpu(), pred)
+    specificity = np.sum(np.diag(cm)) / np.sum(cm)
+
+    file = 'results.txt'
+    custom_print('\nSVM '+datasetname, file)
+    custom_print(f"ACC: {acc}", file)
+    custom_print(f"Macro AUC: {auc.compute()}", file)
+    custom_print(f"F1: {f1}", file)
+    custom_print(f"Precision: {precision}", file)
+    custom_print(f"Recall: {recall}", file)
+    custom_print(f"Specificity: {specificity}", file)
 

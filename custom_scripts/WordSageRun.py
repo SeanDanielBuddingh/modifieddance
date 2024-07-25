@@ -138,3 +138,103 @@ class WordSAGE(torch.nn.Module):
         targets_shuffled = combined_shuffled.iloc[:, num_input_columns:]
         targets_shuffled.columns = [0]
         return inputs_shuffled, targets_shuffled
+
+
+def custom_print(message, file=None):
+    if file:
+        with open(file, 'a') as f:
+            f.write(message + '\n')
+            
+datasets = ['mouse_Brain', 'mouse_Kidney', 'human_Pancreas', 'human_Spleen', 'human_Bonemarrow', 
+            'brain_hard', 'brain_soft', 'tuned_brain_hard', 'tuned_brain_soft',
+            'kidney_hard', 'kidney_soft', 'tuned_kidney_hard', 'tuned_kidney_soft',
+            'pancreas_hard', 'pancreas_soft', 'tuned_pancreas_hard', 'tuned_pancreas_soft',
+            'human_spleen_hard', 'human_spleen_soft', 'tuned_human_spleen_hard', 'tuned_human_spleen_soft',
+            'bone_hard', 'bone_soft', 'tuned_bone_hard', 'tuned_bone_soft']
+for dataset in datasets:
+    
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    seed = 42
+    set_seed(42)
+    src_dim = 2500 
+    dst_dim = 2500 + 175
+    hidden_channels = 2500 
+    out_channels = 2500
+    num_classes = 16
+    model = WordSAGE((src_dim, dst_dim), hidden_channels, out_channels, num_classes).to(device)
+    train_graph, train_targets, test_graph, test_targets, train_nodes, test_nodes = WordSAGE.read_data(self=model, seed=seed)
+
+    targets_encoded_train_np = train_targets.to_numpy()
+    targets_encoded_test_np = test_targets.to_numpy()
+    targets_encoded_train_tensor = torch.tensor(targets_encoded_train_np, dtype=torch.long)
+    targets_encoded_test_tensor = torch.tensor(targets_encoded_test_np, dtype=torch.long)
+    num_classes = len(torch.unique(torch.cat([targets_encoded_train_tensor, targets_encoded_test_tensor], dim=0)))
+    
+    src_dim = train_graph.nodes['gene_node'].data['features'].shape[1]
+    dst_dim = src_dim
+    model = WordSAGE((src_dim, dst_dim), hidden_channels, out_channels, num_classes).to(device)
+    
+    train_targets = torch.tensor(train_targets[0].values, dtype=torch.long).to(device)
+    test_targets = torch.tensor(test_targets[0].values, dtype=torch.long).to(device)
+
+    criterion = torch.nn.CrossEntropyLoss()
+    optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
+
+    train_input_nodes = [i for i in range(train_graph.number_of_nodes()) if i < train_nodes]
+    test_input_nodes = [i for i in range(test_graph.number_of_nodes()) if i < test_nodes]
+
+    train_graph = train_graph.to(device)
+    test_graph = test_graph.to(device)
+
+    train_features = train_graph.nodes['train_node'].data['features']
+    gene_features = train_graph.nodes['gene_node'].data['features']
+    train_feature_map = {'gene_node': gene_features, 'train_node': train_features}
+
+    test_features = test_graph.nodes['train_node'].data['features']
+    gene_test_features = test_graph.nodes['gene_node'].data['features']
+    test_feature_map = {'gene_node': gene_test_features, 'train_node': test_features}
+
+    train_input_nodes = torch.as_tensor(train_input_nodes, dtype=torch.long).to(device)
+    test_input_nodes = torch.as_tensor(test_input_nodes, dtype=torch.long).to(device)
+
+    for epoch in range(300):
+        model.train()
+        optimizer.zero_grad()
+        out = model(train_graph, train_feature_map)
+        train_out = out#['train_node']
+        loss = criterion(train_out, train_targets)
+        loss.backward()
+        optimizer.step()
+
+
+    model.eval()
+    with torch.no_grad():
+        prob = model(test_graph, test_feature_map)
+        test_out = prob#['train_node']
+        test_loss = criterion(test_out, test_targets)
+
+        sftmx = F.softmax(prob[(range(test_nodes))])
+        pred = torch.argmax(sftmx, 1)
+
+        acc = accuracy_score(test_targets.cpu(), pred.cpu())
+
+        auc = MulticlassAUROC(num_classes=num_classes)
+        auc.update(prob[(range(test_nodes))].cpu(), test_targets.cpu())
+        f1 = f1_score(test_targets.cpu(), pred.cpu(), average='macro')
+        precision = precision_score(test_targets.cpu(), pred.cpu(), average='macro')
+        recall = recall_score(test_targets.cpu(), pred.cpu(), average='macro')
+
+        # For specificity, calculate the confusion matrix and derive specificity
+        cm = confusion_matrix(test_targets.cpu(), pred.cpu())
+        specificity = np.sum(np.diag(cm)) / np.sum(cm)
+
+        file = 'results.txt'
+        custom_print('WordSAGE W2V '+dataset, file)
+        custom_print(f"ACC: {acc}", file)
+        custom_print(f"Macro AUC: {auc.compute()}", file)
+        custom_print(f"F1: {f1}", file)
+        custom_print(f"Precision: {precision}", file)
+        custom_print(f"Recall: {recall}", file)
+        custom_print(f"Specificity: {specificity}", file)
+
+

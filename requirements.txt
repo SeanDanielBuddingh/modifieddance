@@ -22,5 +22,8 @@ threadpoolctl==3.2.0
 torchnmf==0.3.5
 tqdm==4.66.1
 torcheval==0.0.7
-dgl==1.1.2
-torchvision==0.17.2
+torchvision==0.16.0
+gensim==4.3.3
+pyyaml==6.0.1
+pydantic==2.8.2
+pytorch-cuda==12.1
