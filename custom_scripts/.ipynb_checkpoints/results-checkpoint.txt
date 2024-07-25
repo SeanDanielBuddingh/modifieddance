@@ -1,0 +1,200 @@
+
+SingleCellNet mouse_Brain
+ACC: 0.9387755102040817
+Macro AUC: 0.9626863598823547
+F1: 0.6343501741404175
+Precision: 0.9208976660271548
+Recall: 0.5540106372422485
+Specificity: 0.9387755102040817
+
+SingleCellNet mouse_Kidney
+ACC: 0.8719211822660099
+Macro AUC: 0.8967973589897156
+F1: 0.8739342653298411
+Precision: 0.9229409905908137
+Recall: 0.8536641018195896
+Specificity: 0.8719211822660099
+
+>>>>Epoch 0269: Train Acc 1.0000, Loss 0.0000, Val correct 764, Val unsure 0, Val Acc 0.9467
+           ^^^^^^^^^^^^^^^^^^^^^
+  File "/root/miniconda/envs/dance/lib/python3.11/site-packages/torcheval/metrics/functional/classification/auroc.py", line 268, in _multiclass_auroc_update_input_check
+    raise ValueError(
+ValueError: input should have shape of (num_sample, num_classes), got torch.Size([2695, 11]) and num_classes=2.
+Finished running deepsort.py.
+Running ACTINN.py...
+Traceback (most recent call last):
+  File "/data/notebook/modifieddance/custom_scripts/ACTINN.py", line 18, in <module>
+    from torchmetrics.classification import MulticlassAUROC
+ModuleNotFoundError: No module named 'torchmetrics'
+Finished running ACTINN.py.
+Running Celltypist.py...
+Traceback (most recent call last):
+  File "/data/notebook/modifieddance/custom_scripts/Celltypist.py", line 18, in <module>
+    from torchmetrics.classification import MulticlassAUROC
+ModuleNotFoundError: No module named 'torchmetrics'
+Finished running Celltypist.py.
+Running singlecellnet.py...
+[INFO][2024-07-25 14:39:21,758][dance][set_seed] Setting global random seed to 42
+[INFO][2024-07-25 14:39:21,759][dance][is_complete] /data/notebook/dance_data/test/human/v
+[INFO][2024-07-25 14:39:21,759][dance][is_complete] file v doesn't exist
+[INFO][2024-07-25 14:39:21,759][dance][is_complete] /data/notebook/dance_data/test/human/v
+[INFO][2024-07-25 14:39:21,759][dance][is_complete] file v doesn't exist
+[INFO][2024-07-25 14:39:21,759][dance][download_file] File already downloaded
+[INFO][2024-07-25 14:39:21,759][dance][download_file] File already downloaded
+[INFO][2024-07-25 14:39:21,759][dance][download_file] File already downloaded
+[INFO][2024-07-25 14:39:21,759][dance][download_file] File already downloaded
+[INFO][2024-07-25 14:39:23,202][dance][download_file] Downloading: /data/notebook/dance_data/map.zip Bytes: 48,215
+100%|████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 47.1k/47.1k [00:00<00:00, 109kB/s]
+[INFO][2024-07-25 14:39:23,650][dance][unzip_file] Unzipping /data/notebook/dance_data/map.zip
+[INFO][2024-07-25 14:39:23,653][dance][delete_file] Deleting /data/notebook/dance_data/map.zip
+[INFO][2024-07-25 14:39:23,653][dance][_load_dfs] Loading data from /data/notebook/dance_data/train/mouse/mouse_Brain753_data.csv
+[INFO][2024-07-25 14:39:24,147][dance][_load_dfs] Loading data from /data/notebook/dance_data/train/mouse/mouse_Brain3285_data.csv
+[INFO][2024-07-25 14:39:27,763][dance][_load_dfs] Loading data from /data/notebook/dance_data/test/mouse/mouse_Brain2695_data.csv
+[INFO][2024-07-25 14:39:31,111][dance][_load_dfs] Loading data from /data/notebook/dance_data/train/mouse/mouse_Brain753_celltype.csv
+[INFO][2024-07-25 14:39:31,113][dance][_load_dfs] Loading data from /data/notebook/dance_data/train/mouse/mouse_Brain3285_celltype.csv
+[INFO][2024-07-25 14:39:31,116][dance][_load_dfs] Loading data from /data/notebook/dance_data/test/mouse/mouse_Brain2695_celltype.csv
+[INFO][2024-07-25 14:39:33,059][dance][_load_raw_data] Loaded expression data: AnnData object with n_obs × n_vars = 6733 × 19856
+[INFO][2024-07-25 14:39:33,059][dance][_load_raw_data] Number of training samples: 4,038
+[INFO][2024-07-25 14:39:33,059][dance][_load_raw_data] Number of testing samples: 2,695
+[INFO][2024-07-25 14:39:33,059][dance][_load_raw_data] Cell-types (n=11):
+['Astrocyte',
+ 'Astroglial cell',
+ 'Granulocyte',
+ 'Hypothalamic ependymal cell',
+ 'Macrophage',
+ 'Microglia',
+[INFO][2024-07-25 14:39:39,700][dance][get_top_gene_pairs]      First five gene pairs: Arl15&Plp1, Ina&Plp1, Dlgap3&Plp1, Arl15&Ptgds, Ina&Ptgds
+[INFO][2024-07-25 14:39:39,700][dance][get_top_gene_pairs] Extracting top gene pairs for Oligodendrocyte precursor cell...
+[INFO][2024-07-25 14:39:39,700][dance][get_top_gene_pairs]      First five DEGs: Aspa, C1ql1, Cacng4, Chchd10, Chst5
+[INFO][2024-07-25 14:39:39,717][dance][get_top_gene_pairs]      First five gene pairs: Cacng4&Chst5, C1ql1&Chst5, Cacng4&Snx22, Cacng4&Neu4, C1ql1&Neu4
+[INFO][2024-07-25 14:39:39,717][dance][get_top_gene_pairs] Extracting top gene pairs for Pan-GABAergic...
+[INFO][2024-07-25 14:39:39,717][dance][get_top_gene_pairs]      First five DEGs: Abhd12, Cd24a, Cenph, Gm17750, Gm8203
+[INFO][2024-07-25 14:39:39,733][dance][get_top_gene_pairs]      First five gene pairs: Igfbpl1&Pbk, Igfbpl1&Lockd, Gm17750&Pclaf, Gm17750&Pbk, Pclaf&Plppr3
+[INFO][2024-07-25 14:39:39,734][dance][get_top_gene_pairs] Extracting top gene pairs for Schwann cell...
+[INFO][2024-07-25 14:39:39,734][dance][get_top_gene_pairs]      First five DEGs: Bin1, Cadm4, Cox8b, Defb11, Ermn
+[INFO][2024-07-25 14:39:39,750][dance][get_top_gene_pairs]      First five gene pairs: Defb11&Frmpd1os, Frmpd1os&Wdr86, Cox8b&Wdr86, Cox8b&Slc16a8, Cox8b&Prr32
+[INFO][2024-07-25 14:39:39,777][dance.SetConfig][__call__] Updating the dance data object config options:
+{'feature_channel': 'SCNFeature', 'label_channel': 'cell_type'}
+[INFO][2024-07-25 14:39:39,778][dance][set_config_from_dict] Setting config 'feature_channel' to 'SCNFeature'
+[INFO][2024-07-25 14:39:39,778][dance][set_config_from_dict] Setting config 'label_channel' to 'cell_type'
+[INFO][2024-07-25 14:39:39,808][dance][set_seed] Setting global random seed to 42
+[INFO][2024-07-25 14:39:40,424][dance][set_seed] Setting global random seed to 42
+[INFO][2024-07-25 14:39:40,425][dance][is_complete] /data/notebook/dance_data/test/human/v
+[INFO][2024-07-25 14:39:40,425][dance][is_complete] file v doesn't exist
+[INFO][2024-07-25 14:39:40,425][dance][is_complete] /data/notebook/dance_data/test/human/v
+[INFO][2024-07-25 14:39:40,425][dance][is_complete] file v doesn't exist
+[INFO][2024-07-25 14:39:40,425][dance][download_file] File already downloaded
+[INFO][2024-07-25 14:39:40,425][dance][download_file] File already downloaded
+[INFO][2024-07-25 14:39:43,423][dance][download_file] Downloading: /data/notebook/dance_data/map.zip Bytes: 48,215
+100%|████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 47.1k/47.1k [00:00<00:00, 128kB/s]
+[INFO][2024-07-25 14:39:43,801][dance][unzip_file] Unzipping /data/notebook/dance_data/map.zip
+[INFO][2024-07-25 14:39:43,803][dance][delete_file] Deleting /data/notebook/dance_data/map.zip
+[INFO][2024-07-25 14:39:43,803][dance][_load_dfs] Loading data from /data/notebook/dance_data/train/mouse/mouse_Kidney4682_data.csv
+[INFO][2024-07-25 14:39:50,887][dance][_load_dfs] Loading data from /data/notebook/dance_data/test/mouse/mouse_Kidney203_data.csv
+[INFO][2024-07-25 14:39:51,213][dance][_load_dfs] Loading data from /data/notebook/dance_data/train/mouse/mouse_Kidney4682_celltype.csv
+[INFO][2024-07-25 14:39:51,218][dance][_load_dfs] Loading data from /data/notebook/dance_data/test/mouse/mouse_Kidney203_celltype.csv
+/root/miniconda/envs/dance/lib/python3.11/site-packages/anndata/_core/anndata.py:430: FutureWarning: The dtype argument is deprecated and will be removed in late 2024.
+  warnings.warn(
+[INFO][2024-07-25 14:39:52,197][dance][_load_raw_data] Loaded expression data: AnnData object with n_obs × n_vars = 4885 × 18328
+[INFO][2024-07-25 14:39:52,197][dance][_load_raw_data] Number of training samples: 4,682
+[INFO][2024-07-25 14:39:52,197][dance][_load_raw_data] Number of testing samples: 203
+[INFO][2024-07-25 14:39:52,197][dance][_load_raw_data] Cell-types (n=20):
+['Adipocyte',
+ 'B cell',
+ 'Dendritic cell',
+ 'Distal collecting duct principal cell',
+ 'Distal convoluted tubule',
+ 'Endothelial cell',
+ 'Epithelial cell',
+ 'Fenestrated endothelial cell',
+ 'Glomerular epithelial cell',
+ 'Intercalated cell',
+ 'Macrophage',
+ 'Metanephric mesenchyme',
+ 'Neutrophil progenitor cell',
+ 'Proximal tubule brush border cell',
+ 'Proximal tubule cell',
+ 'S1 proximal tubule cell',
+ 'Stromal cell',
+ 'T cell',
+ 'Thick ascending limb of the loop of Henle',
+ 'Ureteric epithelium']
+/data/notebook/modifieddance/dance/datasets/singlemodality.py:195: ImplicitModificationWarning: Setting element `.obsm['cell_type']` of view, initializing view as actual.
+  adata.obsm["cell_type"] = cell_label_to_df(cell_labels, idx_to_label, index=adata.obs.index)
+[INFO][2024-07-25 14:39:52,626][dance][load_data] Raw data loaded:
+Data object that wraps (.data):
+AnnData object with n_obs × n_vars = 4885 × 18328
+    uns: 'dance_config'
+    obsm: 'cell_type'
+[INFO][2024-07-25 14:39:52,626][dance][wrapped_func] Took 0:00:12.201662 to load and process data.
+[INFO][2024-07-25 14:39:52,627][dance.Compose][__call__] Applying composed transformations:
+Compose(
+  AnnDataTransform(func=scanpy.preprocessing._normalization.normalize_total, func_kwargs={'target_sum': 10000.0}),
+  AnnDataTransform(func=scanpy.preprocessing._simple.log1p, func_kwargs={}),
+  SCNFeature(num_top_genes=10, alpha1=0.05, alpha2=0.001, mu=2, num_top_gene_pairs=25, max_gene_per_ct=3, split_name='train'),
+  SetConfig(config_dict={'feature_channel': 'SCNFeature', 'label_channel': 'cell_type'}),
+)
+/root/miniconda/envs/dance/lib/python3.11/site-packages/scanpy/preprocessing/_highly_variable_genes.py:215: FutureWarning: The default of observed=False is deprecated and will be changed to True in a future version of pandas. Pass observed=False to retain current behavior or observed=True to adopt the future default and silence this warning.
+  disp_grouped = df.groupby('mean_bin')['dispersions']
+[INFO][2024-07-25 14:39:57,622][dance][get_top_gene_pairs] Extracting top gene pairs for Adipocyte...
+[INFO][2024-07-25 14:39:57,622][dance][get_top_gene_pairs]      First five DEGs: 2610035D17Rik, Atp6v0e, Cd74, Cst3, Defb1
+[INFO][2024-07-25 14:39:57,654][dance][get_top_gene_pairs]      First five gene pairs: 2610035D17Rik&Prkab2, Dvl1&Prkab2, Pop7&Prkab2, Pop7&Tradd, Nubpl&Sowahc
+[INFO][2024-07-25 14:39:57,654][dance][get_top_gene_pairs] Extracting top gene pairs for B cell...
+[INFO][2024-07-25 14:39:57,654][dance][get_top_gene_pairs]      First five DEGs: Atp6v1a, Cd19, Cd63, Cd79a, Cd79b
+[INFO][2024-07-25 14:39:57,674][dance][get_top_gene_pairs]      First five gene pairs: Cd19&Pou2af1, Mzb1&Pou2af1, Cd79a&Iglc2, Cd79a&Pou2af1, Cd79a&Fcrla
+[INFO][2024-07-25 14:39:57,674][dance][get_top_gene_pairs] Extracting top gene pairs for Dendritic cell...
+[INFO][2024-07-25 14:39:57,674][dance][get_top_gene_pairs]      First five DEGs: Arl5c, Atp1b1, Bcl2a1d, Ccl22, Ccr7
+[INFO][2024-07-25 14:39:57,692][dance][get_top_gene_pairs]      First five DEGs: Aldob, Aqp2, Ass1, Blnk, Cldn4
+[INFO][2024-07-25 14:39:57,711][dance][get_top_gene_pairs]      First five DEGs: Aldob, Ass1, Calb1, Clu, Defb1
+[INFO][2024-07-25 14:39:57,738][dance][get_top_gene_pairs]      First five DEGs: Akr1c21, Aldob, Aqp1, Ass1, Bst1
+[INFO][2024-07-25 14:39:57,761][dance][get_top_gene_pairs]      First five DEGs: Aldob, Ankrd1, Anxa2, Ass1, Cldn4
+[INFO][2024-07-25 14:39:57,788][dance][get_top_gene_pairs]      First five gene pairs: Gprc5a&Ifit3b, Ankrd1&Ifit3b, Ifit3&Ifit3b, Anxa2&Dbi, Cldn4&Dbi
+[INFO][2024-07-25 14:39:57,789][dance][get_top_gene_pairs] Extracting top gene pairs for Fenestrated endothelial cell...
+[INFO][2024-07-25 14:39:57,789][dance][get_top_gene_pairs]      First five DEGs: Atp1b1, Atp6v1a, Car2, Cd63, Clcnkb
+[INFO][2024-07-25 14:39:57,808][dance][get_top_gene_pairs]      First five gene pairs: Plvap&Tm4sf1, Fabp4&Mmrn2, Eng&Flt1, Fabp4&Flt1, Flt1&Mmrn2
+[INFO][2024-07-25 14:39:57,809][dance][get_top_gene_pairs] Extracting top gene pairs for Glomerular epithelial cell...
+[INFO][2024-07-25 14:39:57,809][dance][get_top_gene_pairs]      First five DEGs: 6330418K02Rik, Ass1, Atp1a1, Atp6v0e, Atp8a2
+[INFO][2024-07-25 14:39:57,827][dance][get_top_gene_pairs]      First five gene pairs: Atp8a2&Cacna1d, Atp8a2&Cbx8, Cbx8&Gm4956, Gm8369&Jrk, Gm8369&Tedc2
+[INFO][2024-07-25 14:39:57,828][dance][get_top_gene_pairs] Extracting top gene pairs for Intercalated cell...
+[INFO][2024-07-25 14:39:57,828][dance][get_top_gene_pairs]      First five DEGs: Akr1c21, Aldob, Ass1, Atp6v0d2, Atp6v1b1
+[INFO][2024-07-25 14:39:57,846][dance][get_top_gene_pairs]      First five gene pairs: Atp6v0d2&Slc26a4, Atp6v0d2&Hepacam2, Hepacam2&Slc26a4, Atp6v1c2&Slc26a4, Atp6v1c2&Hepacam2
+[INFO][2024-07-25 14:39:57,847][dance][get_top_gene_pairs] Extracting top gene pairs for Macrophage...
+[INFO][2024-07-25 14:39:57,848][dance][get_top_gene_pairs]      First five DEGs: Ass1, Atp1b1, C1qa, C1qb, C1qc
+[INFO][2024-07-25 14:39:57,871][dance][get_top_gene_pairs]      First five gene pairs: Ctss&Il1b, C1qa&Il1b, C1qa&Ccl3, C1qb&Cd52, Ctss&Dbi
+[INFO][2024-07-25 14:39:57,872][dance][get_top_gene_pairs] Extracting top gene pairs for Metanephric mesenchyme...
+[INFO][2024-07-25 14:39:57,892][dance][get_top_gene_pairs] Extracting top gene pairs for Neutrophil progenitor cell...
+[INFO][2024-07-25 14:39:57,998][dance][get_top_gene_pairs] Extracting top gene pairs for T cell...
+[INFO][2024-07-25 14:39:57,998][dance][get_top_gene_pairs]      First five DEGs: Akr1a1, Atp1b1, Atp6v1a, Ccl5, Cd28
+[INFO][2024-07-25 14:39:58,067][dance][get_top_gene_pairs]      First five gene pairs: Fxyd3&Sprr2a3, Ly6d&Sprr2a3, Krt19&Sprr2a3, Fxyd3&Psca, Ly6d&Psca
+[INFO][2024-07-25 14:40:00,658][dance][download_file] Downloading: /data/notebook/dance_data/map.zip Bytes: 48,215
+  File "/data/notebook/modifieddance/dance/datasets/base.py", line 76, in load_raw_data
+  File "/data/notebook/modifieddance/dance/datasets/singlemodality.py", line 157, in _load_raw_data
+                             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/miniconda/envs/dance/lib/python3.11/site-packages/pandas/io/parsers/readers.py", line 611, in _read
+    train_inputs, test_inputs, train_targets, test_targets = WordSAGE.read_data(self=model, seed=seed, dataset)
+                                                                                                              ^
+SyntaxError: positional argument follows keyword argument
+Finished running ACTINN_w2v.py.
+    x_train, x_test, y_train, y_test = WordSAGE.read_data(self=model, seed=seed, dataset)
+                                                                                        ^
+SyntaxError: positional argument follows keyword argument
+                                                                                        ^
+SyntaxError: positional argument follows keyword argument
+Finished running singlecellnet_w2v.py.
+Running svm_w2v.py...
+[INFO][2024-07-25 14:40:34,854][dance][set_seed] Setting global random seed to 42
+Traceback (most recent call last):
+  File "/data/notebook/modifieddance/custom_scripts/svm_w2v.py", line 58, in <module>
+    x_train, x_test, y_train, y_test = WordSAGE.read_data(self=model, seed=seed)
+                                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+TypeError: WordSAGE.read_data() missing 1 required positional argument: 'dataset'
+Finished running svm_w2v.py.
+Running WordSageRun.py...
+[INFO][2024-07-25 14:40:38,882][dance][set_seed] Setting global random seed to 42
+Traceback (most recent call last):
+  File "/data/notebook/modifieddance/custom_scripts/WordSageRun.py", line 165, in <module>
+    train_graph, train_targets, test_graph, test_targets, train_nodes, test_nodes = WordSAGE.read_data(self=model, seed=seed)
+                                                                                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+TypeError: WordSAGE.read_data() missing 1 required positional argument: 'dataset'
+Finished running WordSageRun.py.

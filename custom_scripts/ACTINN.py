@@ -15,7 +15,7 @@ import numpy as np
 
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import roc_auc_score, f1_score, precision_score, recall_score, confusion_matrix, accuracy_score
-from torchmetrics.classification import MulticlassAUROC
+from torcheval.metrics import MulticlassAUROC
 
 from dance.utils import set_seed
 from pprint import pprint
