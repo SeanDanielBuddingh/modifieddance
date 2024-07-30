@@ -48,7 +48,7 @@ for dataset in datasets:
     out_channels = 100
     num_classes = 16
     model = WordSAGE(in_channels, hidden_channels, out_channels, num_classes).to(device)
-    train_inputs, test_inputs, train_targets, test_targets = WordSAGE.read_data(self=model, seed=seed, dataset)
+    train_inputs, test_inputs, train_targets, test_targets = WordSAGE.read_data(self=model, seed=seed, dataset=dataset)
 
     # concatenating either y_hat_markers or y_hard_markers to the input data
     #additional_vars = pd.read_csv(data_dir_+"/y_hat_train.csv", header=None)
@@ -59,6 +59,8 @@ for dataset in datasets:
     train_targets = torch.tensor(train_targets[0].values, dtype=torch.long).to(device)
     test_targets = torch.tensor(test_targets[0].values, dtype=torch.long).to(device)
     print(test_targets)
+    num_classes = len(torch.unique(torch.cat([train_targets, test_targets], dim=0)))
+
     train_inputs = torch.tensor(train_inputs.to_numpy(), dtype=torch.float32).to(device)
     test_inputs = torch.tensor(test_inputs.to_numpy(), dtype=torch.float32).to(device)
     print(train_inputs.size())

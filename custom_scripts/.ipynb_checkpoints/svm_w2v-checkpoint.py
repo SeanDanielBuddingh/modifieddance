@@ -55,11 +55,11 @@ for dataset in datasets:
     out_channels = 100
     num_classes = 21
     model = WordSAGE(in_channels, hidden_channels, out_channels, num_classes).to(device)
-    x_train, x_test, y_train, y_test = WordSAGE.read_data(self=model, seed=seed)
+    x_train, x_test, y_train, y_test = WordSAGE.read_data(self=model, seed=seed, dataset=dataset)
 
     y_train = torch.tensor(y_train[0].values, dtype=torch.long).to(device)
     y_test = torch.tensor(y_test[0].values, dtype=torch.long).to(device)
-
+    num_classes = len(torch.unique(torch.cat([y_train, y_test], dim=0)))
     x_train = torch.tensor(x_train.to_numpy(), dtype=torch.float32).to(device)
     x_test = torch.tensor(x_test.to_numpy(), dtype=torch.float32).to(device)
     model = SVM(True)

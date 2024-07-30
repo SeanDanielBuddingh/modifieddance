@@ -150,7 +150,7 @@ def read_data(batch_size, seed, dataset):
 
     genemarkers = GeneMarkers()
     if not os.path.exists(data_dir_+"/ft_y_"+dataset+"_train.csv"):
-        full_list_train, full_list_test, _ = genemarkers.ConstructTargets(y_values_train[0], y_values_test[0], normalized_train, normalized_test, combined_brain, sublist_length=140, dataset)
+        full_list_train, full_list_test, _ = genemarkers.ConstructTargets(y_values_train[0], y_values_test[0], normalized_train, normalized_test, combined_brain, sublist_length=140, dataset=dataset)
     else:
         full_list_train = pd.read_csv(data_dir_+"/ft_y_"+dataset+"_train.csv", header=None, index_col=None)
         full_list_test = pd.read_csv(data_dir_+"/ft_y_"+dataset+"_test.csv", header=None, index_col=None)
@@ -271,7 +271,7 @@ for dataset in datasets:
     print(device)
     seed = 42
     batch_size = 32
-    train_graphs, bce_targets_train_list, targets_train_list, test_graphs, bce_targets_test_list, targets_test_list, train_nodes_list, test_nodes_list, targets_encoded_train, targets_encoded_test = read_data(batch_size, seed=seed, dataset)
+    train_graphs, bce_targets_train_list, targets_train_list, test_graphs, bce_targets_test_list, targets_test_list, train_nodes_list, test_nodes_list, targets_encoded_train, targets_encoded_test = read_data(batch_size=batch_size, seed=seed, dataset=dataset)
     src_dim = train_graphs[0].nodes['gene_node'].data['features'].shape[1] 
     dst_dim = 2500
     dst_dim2 = len(bce_targets_train_list[0][0][0]) + 2500

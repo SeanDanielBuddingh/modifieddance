@@ -55,10 +55,10 @@ class WordSAGE(torch.nn.Module):
         tissue_train, tissue_test, genes, y_values_train, y_values_test, normalized_train, normalized_test, _, _ = data.read_w2v(dataset)
 
         # concatenating either y_hat_markers or y_hard_markers to the input data
-        additional_vars = pd.read_csv(data_dir_+"/ft_y_train.csv", header=None)
-        tissue_train = pd.concat([tissue_train, additional_vars], axis=1)
-        additional_vars = pd.read_csv(data_dir_+"/ft_y_test.csv", header=None)
-        tissue_test = pd.concat([tissue_test, additional_vars], axis=1)
+        # additional_vars = pd.read_csv(data_dir_+"/ft_y_train.csv", header=None)
+        # tissue_train = pd.concat([tissue_train, additional_vars], axis=1)
+        # additional_vars = pd.read_csv(data_dir_+"/ft_y_test.csv", header=None)
+        # tissue_test = pd.concat([tissue_test, additional_vars], axis=1)
 
         normalized_train = normalized_train.T.reset_index(drop=True)
         normalized_test = normalized_test.T.reset_index(drop=True)

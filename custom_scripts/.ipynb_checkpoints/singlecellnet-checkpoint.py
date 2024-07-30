@@ -47,7 +47,7 @@ for datasetname in datasets:
                                 train_dataset=["15806"], test_dataset=["9887"], data_dir = data_dir_)
         
     elif datasetname == 'human_Bonemarrow':
-        dataset = ScDeepSortDataset(species="human", tissue="Bonemarrow",
+        dataset = ScDeepSortDataset(species="human", tissue="Bone_marrow",
                                 train_dataset=["2261"], test_dataset=["6443"], data_dir = data_dir_)
 
     model = SingleCellNet(num_trees=100)

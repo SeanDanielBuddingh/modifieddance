@@ -45,7 +45,7 @@ for datasetname in datasets:
                                 train_dataset=["15806"], test_dataset=["9887"], data_dir = data_dir_)
         
     elif datasetname == 'human_Bonemarrow':
-        dataset = ScDeepSortDataset(species="human", tissue="Bonemarrow",
+        dataset = ScDeepSortDataset(species="human", tissue="Bone_marrow",
                                 train_dataset=["2261"], test_dataset=["6443"], data_dir = data_dir_)
         
     train_losses = []
@@ -70,47 +70,48 @@ for datasetname in datasets:
     test_labels = torch.tensor(data.data.uns['TestLabels'])
     print('\nHERE ',labels, labels.shape, test_labels, test_labels.shape)
 
-    num_classes = len(torch.unique(torch.cat([labels, test_labels], dim=0)))
+    num_classes = len(torch.unique(torch.cat([labels, test_labels], dim=0).argmax(dim=1)))
     print(
         f"Number of classes: {num_classes}, Number of training samples: {labels.shape[0]}, Number of test samples: {test_labels.shape[0]}"
     )
-#     y_train = torch.argmax(labels, 1)
-#     y_test = torch.argmax(test_labels, 1)
-#     all_labels = torch.cat([y_train, y_test], dim=0)
+    #break
+    y_train = torch.argmax(labels, 1)
+    y_test = torch.argmax(test_labels, 1)
+    all_labels = torch.cat([y_train, y_test], dim=0)
 
-#     model.fit(graph=graph, labels=all_labels)
-#     train_losses = model.train_losses
-#     train_accuracies = model.train_accuracies
+    model.fit(graph=graph, labels=all_labels)
+    train_losses = model.train_losses
+    train_accuracies = model.train_accuracies
 
-#     with torch.no_grad():
-#         result = model.predict_proba(graph=data.data.uns["CellFeatureGraph"])
+    with torch.no_grad():
+        result = model.predict_proba(graph=data.data.uns["CellFeatureGraph"])
 
-#     result = result[-len(y_test):]
-#     result = torch.tensor(result)
-#     predicted = torch.argmax(result, 1)
-#     #torch.set_printoptions(profile="full")
-#     #print(predicted)
-#     correct = (predicted == y_test).sum().item()
-#     total = y_test.numel()
-#     accuracy = correct / total
+    result = result[-len(y_test):]
+    result = torch.tensor(result)
+    predicted = torch.argmax(result, 1)
+    #torch.set_printoptions(profile="full")
+    #print(predicted)
+    correct = (predicted == y_test).sum().item()
+    total = y_test.numel()
+    accuracy = correct / total
 
-#     auc = MulticlassAUROC(num_classes=num_classes)
-#     auc.update(result.cpu(), y_test.cpu())
-#     f1 = f1_score(y_test.cpu(), predicted.cpu(), average='macro')
-#     precision = precision_score(y_test.cpu(), predicted.cpu(), average='macro')
-#     recall = recall_score(y_test.cpu(), predicted.cpu(), average='macro')
+    auc = MulticlassAUROC(num_classes=num_classes)
+    auc.update(result.cpu(), y_test.cpu())
+    f1 = f1_score(y_test.cpu(), predicted.cpu(), average='macro')
+    precision = precision_score(y_test.cpu(), predicted.cpu(), average='macro')
+    recall = recall_score(y_test.cpu(), predicted.cpu(), average='macro')
 
-#     # For specificity, calculate the confusion matrix and derive specificity
-#     cm = confusion_matrix(y_test.cpu(), predicted.cpu())
-#     specificity = np.sum(np.diag(cm)) / np.sum(cm)
+    # For specificity, calculate the confusion matrix and derive specificity
+    cm = confusion_matrix(y_test.cpu(), predicted.cpu())
+    specificity = np.sum(np.diag(cm)) / np.sum(cm)
 
-#     file = 'results.txt'
-#     custom_print('\nScDeepSort '+datasetname, file)
-#     custom_print(f"ACC: {acc}", file)
-#     custom_print(f"Macro AUC: {auc.compute()}", file)
-#     custom_print(f"F1: {f1}", file)
-#     custom_print(f"Precision: {precision}", file)
-#     custom_print(f"Recall: {recall}", file)
-#     custom_print(f"Specificity: {specificity}", file)
+    file = 'results.txt'
+    custom_print('\nScDeepSort '+datasetname, file)
+    custom_print(f"ACC: {acc}", file)
+    custom_print(f"Macro AUC: {auc.compute()}", file)
+    custom_print(f"F1: {f1}", file)
+    custom_print(f"Precision: {precision}", file)
+    custom_print(f"Recall: {recall}", file)
+    custom_print(f"Specificity: {specificity}", file)
 
 

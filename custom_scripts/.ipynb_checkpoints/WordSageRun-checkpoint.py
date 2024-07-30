@@ -55,10 +55,10 @@ class WordSAGE(torch.nn.Module):
         tissue_train, tissue_test, genes, y_values_train, y_values_test, normalized_train, normalized_test, _, _ = data.read_w2v(dataset)
 
         # concatenating either y_hat_markers or y_hard_markers to the input data
-        additional_vars = pd.read_csv(data_dir_+"/ft_y_train.csv", header=None)
-        tissue_train = pd.concat([tissue_train, additional_vars], axis=1)
-        additional_vars = pd.read_csv(data_dir_+"/ft_y_test.csv", header=None)
-        tissue_test = pd.concat([tissue_test, additional_vars], axis=1)
+        # additional_vars = pd.read_csv(data_dir_+"/ft_y_train.csv", header=None)
+        # tissue_train = pd.concat([tissue_train, additional_vars], axis=1)
+        # additional_vars = pd.read_csv(data_dir_+"/ft_y_test.csv", header=None)
+        # tissue_test = pd.concat([tissue_test, additional_vars], axis=1)
 
         normalized_train = normalized_train.T.reset_index(drop=True)
         normalized_test = normalized_test.T.reset_index(drop=True)
@@ -162,7 +162,7 @@ for dataset in datasets:
     out_channels = 2500
     num_classes = 16
     model = WordSAGE((src_dim, dst_dim), hidden_channels, out_channels, num_classes).to(device)
-    train_graph, train_targets, test_graph, test_targets, train_nodes, test_nodes = WordSAGE.read_data(self=model, seed=seed)
+    train_graph, train_targets, test_graph, test_targets, train_nodes, test_nodes = WordSAGE.read_data(self=model, seed=seed, dataset=dataset)
 
     targets_encoded_train_np = train_targets.to_numpy()
     targets_encoded_test_np = test_targets.to_numpy()

@@ -23,7 +23,7 @@ from sklearn.metrics import accuracy_score, f1_score, precision_score, recall_sc
 
 from torcheval.metrics import MulticlassAUROC
 
-from WordSageimport import WordSAGE
+from WordSage import WordSAGE
 
 #ScDeepSort
 from dance.modules.single_modality.cell_type_annotation.scdeepsort import ScDeepSort
@@ -45,13 +45,15 @@ for dataset in datasets:
     hidden_channels = 2500
     out_channels = 100
     num_classes = 20
-    WordSage = WordSAGE(in_channels, hidden_channels, out_channels, num_classes)
+    dim_tuple = 0,0
+    WordSage = WordSAGE(dim_tuple, hidden_channels, out_channels, num_classes)
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     seed = 42
     set_seed(42)
     train_graph, train_targets, test_graph, test_targets, train_nodes, test_nodes = WordSage.read_data(seed, dataset)
     train_targets = torch.tensor(train_targets[0].values, dtype=torch.long).to(device)
     test_targets = torch.tensor(test_targets[0].values, dtype=torch.long).to(device)
+    num_classes = len(torch.unique(torch.cat([train_targets, test_targets], dim=0)))
 
     #ScDeepSort
     in_channels = train_graph.nodes['gene_node'].data['features'].shape[1] 
