@@ -58,7 +58,7 @@ for dataset in datasets:
 
     train_targets = torch.tensor(train_targets[0].values, dtype=torch.long).to(device)
     test_targets = torch.tensor(test_targets[0].values, dtype=torch.long).to(device)
-    print(test_targets)
+    #print(test_targets)
     num_classes = len(torch.unique(torch.cat([train_targets, test_targets], dim=0)))
 
     train_inputs = torch.tensor(train_inputs.to_numpy(), dtype=torch.float32).to(device)
@@ -89,7 +89,7 @@ for dataset in datasets:
     specificity = np.sum(np.diag(cm)) / np.sum(cm)
 
     file = 'results.txt'
-    custom_print('ACTINN W2V '+dataset, file)
+    custom_print('\nACTINN W2V '+dataset, file)
     custom_print(f"ACC: {acc}", file)
     custom_print(f"Macro AUC: {auc.compute()}", file)
     custom_print(f"F1: {f1}", file)

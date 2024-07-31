@@ -89,7 +89,7 @@ for dataset in datasets:
     specificity = np.sum(np.diag(cm)) / np.sum(cm)
 
     file = 'results.txt'
-    custom_print('SVM W2V '+dataset, file)
+    custom_print('\nSVM W2V '+dataset, file)
     custom_print(f"ACC: {acc}", file)
     custom_print(f"Macro AUC: {auc.compute()}", file)
     custom_print(f"F1: {f1}", file)

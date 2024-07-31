@@ -639,6 +639,8 @@ class Celltypist(BaseClassificationMethod):
         not_used[not_used > 10] = 10
         
         # i added this according to the paper. replaces standard scaler which is not in the paper. supplementary materials.
+
+        # Normalizing input data to a target count of 10,000 per cell
         logger.info("Normalizing input data to a target count of 10,000 per cell")
         sc.pp.normalize_per_cell(adata, counts_per_cell_after=1e4)
         

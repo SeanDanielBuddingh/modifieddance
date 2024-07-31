@@ -19,6 +19,6 @@ scripts=(
 for script in "${scripts[@]}"
 do
     echo "Running $script..."
-    python "$script"
+    python "$script" >> output.txt 2>&1
     echo "Finished running $script."
 done
