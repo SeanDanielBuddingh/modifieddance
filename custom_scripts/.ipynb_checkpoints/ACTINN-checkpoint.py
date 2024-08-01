@@ -32,15 +32,15 @@ def custom_print(message, file=None):
 datasets = ['mouse_Brain', 'mouse_Kidney', 'human_Pancreas', 'human_Spleen', 'human_Bonemarrow']
 for datasetname in datasets:
     
-    if datasetname == 'mouse_Brain':
-        dataset = ScDeepSortDataset(species="mouse", tissue="Brain",
-                                train_dataset=["753", "3285"], test_dataset=["2695"], data_dir = data_dir_)
+#     if datasetname == 'mouse_Brain':
+#         dataset = ScDeepSortDataset(species="mouse", tissue="Brain",
+#                                 train_dataset=["753", "3285"], test_dataset=["2695"], data_dir = data_dir_)
         
-    elif datasetname == 'mouse_Kidney':
-        dataset = ScDeepSortDataset(species="mouse", tissue="Kidney",
-                                train_dataset=["4682"], test_dataset=["203"], data_dir = data_dir_)
-        
-    elif datasetname == 'human_Pancreas':
+#     elif datasetname == 'mouse_Kidney':
+#         dataset = ScDeepSortDataset(species="mouse", tissue="Kidney",
+#                                 train_dataset=["4682"], test_dataset=["203"], data_dir = data_dir_)
+    
+    if datasetname == 'human_Pancreas':
         dataset = ScDeepSortDataset(species="human", tissue="Pancreas",
                                 train_dataset=["9727"], test_dataset=["2227", "1841"], data_dir = data_dir_)
         
@@ -50,18 +50,20 @@ for datasetname in datasets:
         
     elif datasetname == 'human_Bonemarrow':
         dataset = ScDeepSortDataset(species="human", tissue="Bone_marrow",
-                                train_dataset=["2261"], test_dataset=["6443"], data_dir = data_dir_)
+                                train_dataset=["2261"], test_dataset=["6443"], data_dir = data_dir_)         
+        
+    dataset = ScDeepSortDataset(species="human", tissue="Pancreas",
+                            train_dataset=["9727"], test_dataset=["2227", "1841"], data_dir = data_dir_)
     
     set_seed(42)
     print(torch.cuda.is_available())
     device=torch.device('cuda')
     model = ACTINN(lambd=0.01, device='cuda')
-
     preprocessing_pipeline = model.preprocessing_pipeline(normalize=True, filter_genes=True)
 
     data = dataset.load_data()
     preprocessing_pipeline(data)
-
+    
     x_train, y_train = data.get_train_data(return_type="torch")
     x_test, y_test = data.get_test_data(return_type="torch")
     seed = 42
@@ -74,6 +76,7 @@ for datasetname in datasets:
     y_train = y_train.to(device)
     y_test = y_test.to(device)
     num_classes = len(torch.unique(torch.cat([y_train, y_test], dim=0)))
+    print(num_classes)
     x_train = x_train.to(device)
     x_test = x_test.to(device)
 

@@ -33,18 +33,12 @@ class data_pre():
         
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
-#         brain_train, brain_test, brain_train_labels, brain_test_labels, corpus_train_brain, spleen_train, spleen_test, spleen_train_labels, spleen_test_labels, corpus_train_spleen, kidney_train, kidney_test, kidney_train_labels, kidney_test_labels, corpus_train_kidney = self.load_data()
-#         pancreas_train, pancreas_test, pancreas_train_labels, pancreas_test_labels, corpus_train_pancreas, spleen_train, spleen_test, spleen_train_labels, spleen_test_labels, corpus_train_spleen, bonemarrow_train, bonemarrow_test, bonemarrow_train_labels, bonemarrow_test_labels, corpus_train_bonemarrow = self.load_human_data()
+        brain_train, brain_test, brain_train_labels, brain_test_labels, corpus_train_brain, spleen_train, spleen_test, spleen_train_labels, spleen_test_labels, corpus_train_spleen, kidney_train, kidney_test, kidney_train_labels, kidney_test_labels, corpus_train_kidney = self.load_data()
+        pancreas_train, pancreas_test, pancreas_train_labels, pancreas_test_labels, corpus_train_pancreas, spleen_train, spleen_test, spleen_train_labels, spleen_test_labels, corpus_train_spleen, bonemarrow_train, bonemarrow_test, bonemarrow_train_labels, bonemarrow_test_labels, corpus_train_bonemarrow = self.load_human_data()
 
-#         self.get_w2v(brain_train, brain_test, brain_train_labels, brain_test_labels, corpus_train_brain, spleen_train, spleen_test, spleen_train_labels, spleen_test_labels, corpus_train_spleen, kidney_train, kidney_test, kidney_train_labels, kidney_test_labels, corpus_train_kidney)
-#         self.get_w2v_human(pancreas_train, pancreas_test, pancreas_train_labels, pancreas_test_labels, corpus_train_pancreas, spleen_train, spleen_test, spleen_train_labels, spleen_test_labels, corpus_train_spleen, bonemarrow_train, bonemarrow_test, bonemarrow_train_labels, bonemarrow_test_labels, corpus_train_bonemarrow)
+        self.get_w2v(brain_train, brain_test, brain_train_labels, brain_test_labels, corpus_train_brain, spleen_train, spleen_test, spleen_train_labels, spleen_test_labels, corpus_train_spleen, kidney_train, kidney_test, kidney_train_labels, kidney_test_labels, corpus_train_kidney)
+        self.get_w2v_human(pancreas_train, pancreas_test, pancreas_train_labels, pancreas_test_labels, corpus_train_pancreas, spleen_train, spleen_test, spleen_train_labels, spleen_test_labels, corpus_train_spleen, bonemarrow_train, bonemarrow_test, bonemarrow_train_labels, bonemarrow_test_labels, corpus_train_bonemarrow)
 
-        #self.bert_embed(brain_test, corpus_brain, brain_y)
-        #self.bert_embed(spleen_x, corpus_spleen, spleen_y)
-        #self.bert_embed(spleen_x, corpus_spleen, kidney_y)
-        #self.bert_embed(brain_train, corpus_btrain, btrain_y)
-        #self.bert_embed(s_train, corpus_strain, strain_y)
-        #self.bert_embed(k_train, corpus_ktrain, ktrain_y)
     def load_human_data(self):
         '''
         Human Pancreas
@@ -60,7 +54,7 @@ class data_pre():
         #removes labels with only one occurence 
         name_counts = pancreas_train_y.value_counts()
 
-        unique_name = name_counts[name_counts == 1].index
+        unique_name = name_counts[name_counts <= 10].index
         
         unique_index = pancreas_train_y[pancreas_train_y.isin(unique_name)].index
 
@@ -73,7 +67,7 @@ class data_pre():
 
         name_counts = pancreas_test_y.value_counts()
 
-        unique_name = name_counts[name_counts == 1].index
+        unique_name = name_counts[name_counts <= 10].index
         
         unique_index = pancreas_test_y[pancreas_test_y.isin(unique_name)].index
 
@@ -1278,4 +1272,4 @@ class data_pre():
 
 #         print(outputs)
 #         return outputs
-# data = data_pre()
+data = data_pre()

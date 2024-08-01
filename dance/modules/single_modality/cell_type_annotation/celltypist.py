@@ -39,9 +39,9 @@ class Model():
 
     """
 
-    def __init__(self, clf, scaler, description):
+    def __init__(self, clf, description):
         self.classifier = clf
-        self.scaler = scaler
+        #self.scaler = scaler
         self.description = description
 
     @property
@@ -405,11 +405,11 @@ class Classifier():
         self.indata_genes = self.indata_genes[k_x_idx]
         lr_idx = np.where(np.isin(self.model.classifier.features, self.indata_genes))[0]
 
-        logger.info("Scaling input data")
-        means_ = self.model.scaler.mean_[lr_idx]
-        sds_ = self.model.scaler.scale_[lr_idx]
-        self.indata = (self.indata[:, k_x_idx] - means_) / sds_
-        self.indata[self.indata > 10] = 10
+        #logger.info("Scaling input data")
+        #means_ = self.model.scaler.mean_[lr_idx]
+        #sds_ = self.model.scaler.scale_[lr_idx]
+        #self.indata = (self.indata[:, k_x_idx] - means_) / sds_
+        #self.indata[self.indata > 10] = 10
 
         # Temporarily replace with subsetted features, will recover after running the prediction function
         ni, fs, cf = self.model.classifier.n_features_in_, self.model.classifier.features, self.model.classifier.coef_
@@ -634,22 +634,26 @@ class Celltypist(BaseClassificationMethod):
 
         adata = sc.AnnData(X=indata.cpu().numpy())
         
-        scaler = StandardScaler()
-        not_used = scaler.fit_transform(indata)
-        not_used[not_used > 10] = 10
+        if not np.any(adata.X < 0):
         
-        # i added this according to the paper. replaces standard scaler which is not in the paper. supplementary materials.
+            #scaler = StandardScaler()
+            #not_used = scaler.fit_transform(indata)
+            #not_used[not_used > 10] = 10
 
-        # Normalizing input data to a target count of 10,000 per cell
-        logger.info("Normalizing input data to a target count of 10,000 per cell")
-        sc.pp.normalize_per_cell(adata, counts_per_cell_after=1e4)
-        
-        # i removed this.. why .. its not in the paper
-        #indata[indata > 10] = 10
+            # Dependency on StandardScalar removed. 
+            
+            # i added this according to the paper. replaces standard scaler which is not in the paper. supplementary materials.
 
-        # i added log1p. its in spplementary materials of celltypist
-        logger.info("Applying log1p transformation")
-        sc.pp.log1p(adata)
+            # Normalizing input data to a target count of 10,000 per cell
+            logger.info("Normalizing input data to a target count of 10,000 per cell")
+            sc.pp.normalize_per_cell(adata, counts_per_cell_after=1e4)
+
+            # i removed this.. why .. its not in the paper
+            #indata[indata > 10] = 10
+
+            # i added log1p. its in spplementary materials of celltypist
+            logger.info("Applying log1p transformation")
+            sc.pp.log1p(adata)
         
         indata = adata.X
         indata = torch.tensor(indata).to('cpu')
@@ -684,10 +688,10 @@ class Celltypist(BaseClassificationMethod):
             else:
                 classifier = LRClassifier_celltypist(indata=indata[:, gene_index], labels=labels, C=C, solver=solver,
                                                      max_iter=max_iter, n_jobs=n_jobs, **kwargs)
-            scaler.mean_ = scaler.mean_[gene_index]
-            scaler.var_ = scaler.var_[gene_index]
-            scaler.scale_ = scaler.scale_[gene_index]
-            scaler.n_features_in_ = len(gene_index)
+            #scaler.mean_ = scaler.mean_[gene_index]
+            #scaler.var_ = scaler.var_[gene_index]
+            #scaler.scale_ = scaler.scale_[gene_index]
+            #scaler.n_features_in_ = len(gene_index)
 
         # Model finalization
         classifier.features = genes
@@ -695,7 +699,7 @@ class Celltypist(BaseClassificationMethod):
         logger.info("Model training done")
 
         self.classifier = classifier
-        self.scaler = scaler
+        #self.scaler = scaler
         self.description = description
 
     def predict(self, x: np.ndarray, as_obj: bool = False, over_clustering: Optional[Union[str, list, tuple, np.ndarray,
@@ -727,7 +731,7 @@ class Celltypist(BaseClassificationMethod):
 
         """
         # Construct classifier
-        lr_classifier = Model(self.classifier, self.scaler, self.description)
+        lr_classifier = Model(self.classifier, self.description)
         clf = Classifier(x=x, model=lr_classifier)
 
         # Predict

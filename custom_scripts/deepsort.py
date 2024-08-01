@@ -93,7 +93,7 @@ for datasetname in datasets:
     #print(predicted)
     correct = (predicted == y_test).sum().item()
     total = y_test.numel()
-    accuracy = correct / total
+    acc = correct / total
 
     auc = MulticlassAUROC(num_classes=num_classes)
     auc.update(result.cpu(), y_test.cpu())

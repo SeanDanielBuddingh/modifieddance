@@ -600,13 +600,13 @@ class data_pre():
             return tissue_train, tissue_test, genes, y_values_train, y_values_test, normalized_train, normalized_test, pancreas_train, pancreas_test
         
         elif dataset == 'human_Spleen':
-            tissue_train = pd.read_csv(self.path+'/human_spleen_train.csv', header=None)
-            tissue_test = pd.read_csv(self.path+'/human_spleen_test.csv', header=None)
-            genes = pd.read_csv(self.path+'/human_spleen_w2v_genes.csv', header=None)
-            y_values_train = pd.read_csv(self.path+'/human_spleen_train_labels.csv', skiprows=1, header=None, dtype=str)
-            y_values_test = pd.read_csv(self.path+'/human_spleen_test_labels.csv', skiprows=1, header=None, dtype=str)
-            normalized_train = pd.read_csv(self.path+'/normalized_human_spleen_train.csv', header=0, index_col=0)
-            normalized_test = pd.read_csv(self.path+'/normalized_human_spleen_test.csv', header=0, index_col=0)
+            tissue_train = pd.read_csv(self.path+'/spleen_human_train.csv', header=None)
+            tissue_test = pd.read_csv(self.path+'/spleen_human_test.csv', header=None)
+            genes = pd.read_csv(self.path+'/spleen_human_w2v_genes.csv', header=None)
+            y_values_train = pd.read_csv(self.path+'/spleen_human_train_labels.csv', skiprows=1, header=None, dtype=str)
+            y_values_test = pd.read_csv(self.path+'/spleen_human_test_labels.csv', skiprows=1, header=None, dtype=str)
+            normalized_train = pd.read_csv(self.path+'/normalized_spleen_human_train.csv', header=0, index_col=0)
+            normalized_test = pd.read_csv(self.path+'/normalized_spleen_human_test.csv', header=0, index_col=0)
 
             # raw inputs
 
@@ -1006,13 +1006,13 @@ class data_pre():
 
         elif dataset == 'human_spleen_hard':
             underlying = 'human_Spleen'
-            tissue_train = pd.read_csv(self.path+'/human_spleen_train.csv', header=None)
-            tissue_test = pd.read_csv(self.path+'/human_spleen_test.csv', header=None)
-            genes = pd.read_csv(self.path+'/human_spleen_w2v_genes.csv', header=None)
-            y_values_train = pd.read_csv(self.path+'/human_spleen_train_labels.csv', skiprows=1, header=None, dtype=str)
-            y_values_test = pd.read_csv(self.path+'/human_spleen_test_labels.csv', skiprows=1, header=None, dtype=str)
-            normalized_train = pd.read_csv(self.path+'/normalized_human_spleen_train.csv', header=0, index_col=0)
-            normalized_test = pd.read_csv(self.path+'/normalized_human_spleen_test.csv', header=0, index_col=0)
+            tissue_train = pd.read_csv(self.path+'/spleen_human_train.csv', header=None)
+            tissue_test = pd.read_csv(self.path+'/spleen_human_test.csv', header=None)
+            genes = pd.read_csv(self.path+'/spleen_human_w2v_genes.csv', header=None)
+            y_values_train = pd.read_csv(self.path+'/spleen_human_train_labels.csv', skiprows=1, header=None, dtype=str)
+            y_values_test = pd.read_csv(self.path+'/spleen_human_test_labels.csv', skiprows=1, header=None, dtype=str)
+            normalized_train = pd.read_csv(self.path+'/normalized_spleen_human_train.csv', header=0, index_col=0)
+            normalized_test = pd.read_csv(self.path+'/normalized_spleen_human_test.csv', header=0, index_col=0)
             
             spleen_hard_bce_train = pd.read_csv(self.path+"/ft_y_"+underlying+"_train.csv", header=None)
             spleen_hard_bce_test = pd.read_csv(self.path+"/ft_y_"+underlying+"_test.csv", header=None)
@@ -1028,13 +1028,13 @@ class data_pre():
         
         elif dataset == 'human_spleen_soft':
             underlying = 'human_Spleen'
-            tissue_train = pd.read_csv(self.path+"/human_spleen_train.csv", header=None)
-            tissue_test = pd.read_csv(self.path+"/human_spleen_test.csv", header=None)
-            genes = pd.read_csv(self.path+'/pancreas_w2v_genes.csv', header=None)
-            y_values_train = pd.read_csv(self.path+'/human_spleen_train_labels.csv', skiprows=1, header=None, dtype=str)
-            y_values_test = pd.read_csv(self.path+'/human_spleen_test_labels.csv', skiprows=1, header=None, dtype=str)
-            normalized_train = pd.read_csv(self.path+'/normalized_human_spleen_train.csv', header=0, index_col=0)
-            normalized_test = pd.read_csv(self.path+'/normalized_human_spleen_test.csv', header=0, index_col=0)
+            tissue_train = pd.read_csv(self.path+'/spleen_human_train.csv', header=None)
+            tissue_test = pd.read_csv(self.path+'/spleen_human_test.csv', header=None)
+            genes = pd.read_csv(self.path+'/spleen_human_w2v_genes.csv', header=None)
+            y_values_train = pd.read_csv(self.path+'/spleen_human_train_labels.csv', skiprows=1, header=None, dtype=str)
+            y_values_test = pd.read_csv(self.path+'/spleen_human_test_labels.csv', skiprows=1, header=None, dtype=str)
+            normalized_train = pd.read_csv(self.path+'/normalized_spleen_human_train.csv', header=0, index_col=0)
+            normalized_test = pd.read_csv(self.path+'/normalized_spleen_human_test.csv', header=0, index_col=0)
 
             human_spleen_soft_bce_train = pd.read_csv(self.path+"/y_hat_"+underlying+"_train.csv", header=None)
             human_spleen_soft_bce_test = pd.read_csv(self.path+"/y_hat_"+underlying+"_test.csv", header=None)
@@ -1065,11 +1065,11 @@ class data_pre():
             underlying = 'human_Spleen'
             tissue_train = pd.read_csv(self.path+"/tuned_"+underlying+"_hard_train.csv", header=None)
             tissue_test = pd.read_csv(self.path+"/tuned_"+underlying+"_hard_test.csv", header=None)
-            genes = pd.read_csv(self.path+'/human_spleen_w2v_genes.csv', header=None)
-            y_values_train = pd.read_csv(self.path+'/human_spleen_train_labels.csv', skiprows=1, header=None, dtype=str)
-            y_values_test = pd.read_csv(self.path+'/human_spleen_test_labels.csv', skiprows=1, header=None, dtype=str)
-            normalized_train = pd.read_csv(self.path+'/normalized_human_spleen_train.csv', header=0, index_col=0)
-            normalized_test = pd.read_csv(self.path+'/normalized_human_spleen_test.csv', header=0, index_col=0)
+            genes = pd.read_csv(self.path+'/spleen_human_w2v_genes.csv', header=None)
+            y_values_train = pd.read_csv(self.path+'/spleen_human_train_labels.csv', skiprows=1, header=None, dtype=str)
+            y_values_test = pd.read_csv(self.path+'/spleen_human_test_labels.csv', skiprows=1, header=None, dtype=str)
+            normalized_train = pd.read_csv(self.path+'/normalized_spleen_human_train.csv', header=0, index_col=0)
+            normalized_test = pd.read_csv(self.path+'/normalized_spleen_human_test.csv', header=0, index_col=0)
             
             train_y = pd.read_csv(self.path+"/tuned_"+underlying+"_hard_train_labels.csv", skiprows=1, header=None, dtype=str)
             test_y = pd.read_csv(self.path+"/tuned_"+underlying+"_hard_test_labels.csv", skiprows=1, header=None, dtype=str)
@@ -1098,11 +1098,11 @@ class data_pre():
             underlying = 'human_Spleen'
             tissue_train = pd.read_csv(self.path+"/tuned_"+underlying+"_train.csv", header=None)
             tissue_test = pd.read_csv(self.path+"/tuned_"+underlying+"_test.csv", header=None)
-            genes = pd.read_csv(self.path+'/human_spleen_w2v_genes.csv', header=None)
-            y_values_train = pd.read_csv(self.path+'/human_spleen_train_labels.csv', skiprows=1, header=None, dtype=str)
-            y_values_test = pd.read_csv(self.path+'/human_spleen_test_labels.csv', skiprows=1, header=None, dtype=str)
-            normalized_train = pd.read_csv(self.path+'/normalized_human_spleen_train.csv', header=0, index_col=0)
-            normalized_test = pd.read_csv(self.path+'/normalized_human_spleen_test.csv', header=0, index_col=0)
+            genes = pd.read_csv(self.path+'/spleen_human_w2v_genes.csv', header=None)
+            y_values_train = pd.read_csv(self.path+'/spleen_human_train_labels.csv', skiprows=1, header=None, dtype=str)
+            y_values_test = pd.read_csv(self.path+'/spleen_human_test_labels.csv', skiprows=1, header=None, dtype=str)
+            normalized_train = pd.read_csv(self.path+'/normalized_spleen_human_train.csv', header=0, index_col=0)
+            normalized_test = pd.read_csv(self.path+'/normalized_spleen_human_test.csv', header=0, index_col=0)
             
             train_y = pd.read_csv(self.path+"/tuned_"+underlying+"_train_labels.csv", skiprows=1, header=None, dtype=str)
             test_y = pd.read_csv(self.path+"/tuned_"+underlying+"_test_labels.csv", skiprows=1, header=None, dtype=str)
