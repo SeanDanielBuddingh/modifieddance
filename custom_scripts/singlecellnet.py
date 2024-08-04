@@ -50,6 +50,8 @@ for datasetname in datasets:
         dataset = ScDeepSortDataset(species="human", tissue="Bone_marrow",
                                 train_dataset=["2261"], test_dataset=["6443"], data_dir = data_dir_)
 
+    dataset = ScDeepSortDataset(species="human", tissue="Pancreas",
+                    train_dataset=["9727"], test_dataset=["2227", "1841"], data_dir = data_dir_)
     model = SingleCellNet(num_trees=100)
     device = torch.device('cpu' if torch.cuda.is_available() else 'cpu')
     seed = 42
@@ -63,6 +65,7 @@ for datasetname in datasets:
     seed = 42
     y_train = torch.argmax(y_train, dim=1)
     y_test = torch.argmax(y_test, dim=1)
+    print(torch.unique(y_train), torch.unique(y_test))
     num_classes = len(torch.unique(torch.cat([y_train, y_test], dim=0)))
 
     set_seed(42)
@@ -78,7 +81,7 @@ for datasetname in datasets:
     probs = model.predict_proba(x_test.numpy())
 
     acc = accuracy_score(y_test.numpy(), pred)
-
+    print(torch.as_tensor(probs).cpu().shape, y_test.cpu().shape)
     auc = MulticlassAUROC(num_classes=num_classes)
     auc.update(torch.as_tensor(probs).cpu(), y_test.cpu())
     f1 = f1_score(y_test, pred, average='macro')

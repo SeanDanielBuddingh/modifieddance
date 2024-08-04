@@ -18,7 +18,6 @@ from dance.modules.base import BaseClassificationMethod
 from dance.transforms import AnnDataTransform, Compose, FilterGenesPercentile, SetConfig
 from dance.typing import LogLevel, Optional, Tuple
 
-
 class ACTINN(BaseClassificationMethod):
     """The ACTINN cell-type classification model.
 

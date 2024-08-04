@@ -187,13 +187,19 @@ class ScDeepSortDataset(BaseDataset):
         adata, cell_labels, idx_to_label, train_size = raw_data
         
         # Removing minority classes which are an issue in the human cell atlas dataset.
-        labels = [list(label_set)[0] for label_set in cell_labels]
+        for i, item in enumerate(cell_labels):
+            if isinstance(item, set):
+                cell_labels[i] = list(item)[0]
+        labels = [label_set for label_set in cell_labels]
         label_counts = Counter(labels)
         print('Label Counts (Less than 10 are removed): ',label_counts)
-        min_samples = 10 
+        min_samples = 1 
         labels_to_keep = [label for label, count in label_counts.items() if count >= min_samples]
         mask = np.isin(cell_labels, labels_to_keep)
+        print(mask)
+        print('before: ',adata.X.shape)
         adata = adata[mask]
+        print('after: ',adata.X.shape)
         cell_labels = [label for label, keep in zip(cell_labels, mask) if keep]
         unique_labels = sorted(set(cell_labels))
         idx_to_label = [label for i, label in enumerate(unique_labels)]
@@ -206,6 +212,7 @@ class ScDeepSortDataset(BaseDataset):
         
         adata.obsm["cell_type"] = cell_label_to_df(cell_labels, idx_to_label, index=adata.obs.index)
         data = Data(adata, train_size=train_size)
+        print('Raw to dance completed.')
         return data
 
     @staticmethod

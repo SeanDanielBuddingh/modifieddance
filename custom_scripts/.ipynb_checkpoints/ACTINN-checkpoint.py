@@ -52,8 +52,8 @@ for datasetname in datasets:
         dataset = ScDeepSortDataset(species="human", tissue="Bone_marrow",
                                 train_dataset=["2261"], test_dataset=["6443"], data_dir = data_dir_)         
         
-    dataset = ScDeepSortDataset(species="human", tissue="Pancreas",
-                            train_dataset=["9727"], test_dataset=["2227", "1841"], data_dir = data_dir_)
+    dataset = ScDeepSortDataset(species="human", tissue="Spleen",
+                            train_dataset=["15806"], test_dataset=["9887"], data_dir = data_dir_) 
     
     set_seed(42)
     print(torch.cuda.is_available())
